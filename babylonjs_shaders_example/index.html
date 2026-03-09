@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Babylon.js Shader Examples</title>
+    <style>
+        html, body {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #333;
+            color: white;
+            font-family: sans-serif;
+        }
+        #canvasZone {
+            width: 100%;
+            height: 100%;
+        }
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            background: rgba(0,0,0,0.5);
+            padding: 15px;
+            border-radius: 8px;
+        }
+        button {
+            padding: 8px 16px;
+            cursor: pointer;
+            background: #eee;
+            border: none;
+            border-radius: 4px;
+            margin-right: 5px;
+        }
+        button:hover { background: #ccc; }
+    </style>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+</head>
+<body>
+    <div id="ui">
+        <h2>Babylon.js + WebGL Shaders</h2>
+        <button onclick="loadExample('basic')">Basic Shapes Shader</button>
+        <button onclick="loadExample('shadertoy')">Shadertoy Texture</button>
+        <button onclick="loadExample('procedural')">Procedural Box/Sphere</button>
+    </div>
+    <div id="canvasZone">
+        <canvas id="renderCanvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("renderCanvas");
+        const engine = new BABYLON.Engine(canvas, true);
+        let currentScene = null;
+
+        const loadExample = (type) => {
+            if (currentScene) {
+                currentScene.dispose();
+            }
+            
+            // Clear existing scripts if any
+            const existingScript = document.getElementById("example-script");
+            if (existingScript) existingScript.remove();
+
+            const script = document.createElement("script");
+            script.id = "example-script";
+            script.src = type + "_example.js";
+            script.onload = () => {
+                currentScene = createExampleScene(engine, canvas);
+                engine.runRenderLoop(() => {
+                    currentScene.render();
+                });
+            };
+            document.body.appendChild(script);
+        };
+
+        // Resize
+        window.addEventListener("resize", () => {
+            engine.resize();
+        });
+
+        // Load default
+        window.addEventListener("DOMContentLoaded", () => {
+            loadExample('basic');
+        });
+    </script>
+</body>
+</html>
