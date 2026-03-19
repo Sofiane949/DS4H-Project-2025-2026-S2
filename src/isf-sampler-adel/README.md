@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-# DS4H-Project-2025-2026-S2
-=======
 # ISF Renderer
 
 Rendu de shaders ISF (Interactive Shader Format) avec sequenceur audio-reactif et chainage de shaders.
@@ -83,4 +80,3 @@ isf-renderer/
 - **WebGL 2** / GLSL 300 es
 - **Web Audio API** (AnalyserNode, AudioContext)
 - **Express** (serveur backend)
->>>>>>> 4801fab (docs: ajout du README avec instructions de lancement)
