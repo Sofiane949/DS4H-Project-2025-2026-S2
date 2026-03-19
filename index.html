@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISF Renderer — Phase 3: Chaining</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: #080812;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 28px;
+            padding: 0 20px 32px 20px;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            color: #6070a0;
+        }
+
+        h1 {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2.5px;
+            color: #404070;
+        }
+
+        /* ── Chain layout ── */
+        .chain {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        isf-renderer { width: min(500px, 90vw); }
+
+        /* Arrow between components */
+        .arrow {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: #e0506a;
+            flex-shrink: 0;
+        }
+        .arrow svg { width: 28px; }
+        .arrow span {
+            font-family: 'Courier New', monospace;
+            font-size: 9px;
+            color: #e0506a88;
+            letter-spacing: 1px;
+        }
+
+        footer {
+            font-size: 10px;
+            color: #222244;
+            text-align: center;
+            line-height: 1.8;
+        }
+        footer code {
+            background: #10102a;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #4050a0;
+        }
+    </style>
+</head>
+<body>
+
+    <script type="module" src="./navbar.js"></script>
+    <app-navbar></app-navbar>
+
+    <h1 style="margin-top:24px">ISF Renderer — Phase 3 — Chaining Demo</h1>
+
+    <div class="chain">
+
+        <!-- Source: generates the checkerboard -->
+        <isf-renderer id="r1" shader="checkerboard"></isf-renderer>
+
+        <!-- Arrow connector -->
+        <div class="arrow">
+            <svg viewBox="0 0 28 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <line x1="0" y1="8" x2="22" y2="8" stroke="#e0506a" stroke-width="1.5"/>
+                <polyline points="18,3 24,8 18,13" stroke="#e0506a" stroke-width="1.5"
+                          fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+            </svg>
+            <span>connect()</span>
+        </div>
+
+        <!-- Effect: samples r1's canvas, applies colorize -->
+        <isf-renderer id="r2" shader="colorize"></isf-renderer>
+
+    </div>
+
+    <footer>
+        r1.connect(r2) — r1 feeds its output into r2 as <code>inputImage</code><br>
+        Adjust knobs in r1 (checkerboard parameters) and r2 (hue · saturation · invert)
+    </footer>
+
+    <script type="module">
+        import { ISFRenderer } from './isf-renderer.js';
+
+        const r1 = document.getElementById('r1');
+        const r2 = document.getElementById('r2');
+
+        // Wait for both to finish loading their shaders before chaining
+        let r1Ready = false, r2Ready = false;
+
+        r1.addEventListener('shaderloaded', () => { r1Ready = true; tryChain(); });
+        r2.addEventListener('shaderloaded', () => { r2Ready = true; tryChain(); });
+
+        function tryChain() {
+            if (r1Ready && r2Ready) {
+                r1.connect(r2);   // r1 becomes the source feeding into r2
+            }
+        }
+    </script>
+
+</body>
+</html>

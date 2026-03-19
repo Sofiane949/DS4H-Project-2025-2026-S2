@@ -1,0 +1,22 @@
+{
+  "name": "rendu-webaudio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "test": "node tests/sampler.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
+    "express": "^4.19.2",
+    "mongoose": "^9.1.5",
+    "morgan": "^1.10.0",
+    "multer": "^2.0.2"
+  },
+  "devDependencies": {
+    "puppeteer": "^24.2.1"
+  }
+}

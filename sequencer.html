@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISF Renderer — Sequenceur</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: #080812;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
+            padding: 0 0 40px 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            color: #6070a0;
+        }
+
+        h1 {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2.5px;
+            color: #404070;
+            margin-top: 24px;
+        }
+
+        /* ── Disposition principale ── */
+        .layout {
+            display: flex;
+            gap: 24px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding: 0 20px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .left-col {
+            flex: 1;
+            min-width: 320px;
+            max-width: 540px;
+        }
+
+        isf-renderer { width: 100%; }
+
+        /* ── Panneau de controle ── */
+        .ctrl-panel {
+            background: #0d0d22;
+            border: 1px solid #1e1e40;
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            min-width: 280px;
+            max-width: 420px;
+        }
+
+        .panel-title {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #303060;
+            border-bottom: 1px solid #1a1a38;
+            padding-bottom: 6px;
+        }
+
+        /* ── Selecteur de preset ── */
+        .preset-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .preset-label {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #404060;
+            flex-shrink: 0;
+        }
+
+        .preset-sel {
+            flex: 1;
+            background: #10102a;
+            border: 1px solid #1e1e42;
+            border-radius: 5px;
+            color: #5870c0;
+            font-size: 11px;
+            padding: 5px 8px;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .preset-sel:focus { border-color: #e0506a; }
+
+        .loading-bar {
+            height: 3px;
+            background: #111128;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .loading-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #e0506a, #ff8090);
+            transition: width 0.15s;
+        }
+
+        /* ── Transport ── */
+        .transport {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .transport-btn {
+            background: #12122a;
+            border: 1px solid #22224a;
+            border-radius: 5px;
+            color: #5060a0;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 7px 14px;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .transport-btn:hover { background: #1a1a38; border-color: #3a3a80; color: #8898e0; }
+        .transport-btn.playing { background: #1e0a14; border-color: #e0506a; color: #e0506a; }
+        .transport-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        .bpm-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: auto;
+        }
+        .bpm-label {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #404060;
+        }
+        .bpm-input {
+            background: #10102a;
+            border: 1px solid #1e1e42;
+            border-radius: 4px;
+            color: #e0506a;
+            font-size: 13px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            width: 48px;
+            text-align: center;
+            padding: 3px;
+            outline: none;
+        }
+        .bpm-input:focus { border-color: #e0506a; }
+
+        .bpm-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 80px;
+            height: 4px;
+            background: #1a1a38;
+            border-radius: 2px;
+            outline: none;
+        }
+        .bpm-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px; height: 12px;
+            background: #e0506a;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        /* ── Grille du sequenceur ── */
+        .seq-grid-wrap {
+            overflow-x: auto;
+            padding-bottom: 4px;
+        }
+
+        .seq-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: max-content;
+        }
+
+        .seq-row {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .pad-label {
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #404060;
+            width: 64px;
+            flex-shrink: 0;
+            text-align: right;
+            padding-right: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .seq-cell {
+            width: 28px;
+            height: 24px;
+            background: #111128;
+            border: 1px solid #1a1a38;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background 0.1s, border-color 0.1s, box-shadow 0.1s;
+            flex-shrink: 0;
+        }
+        .seq-cell:hover { background: #1a1a40; border-color: #2a2a60; }
+        .seq-cell.on {
+            background: linear-gradient(135deg, #e0506a33, #e0506a22);
+            border-color: #e0506a66;
+        }
+        .seq-cell.current {
+            box-shadow: inset 0 0 0 1.5px #e0506a;
+        }
+        .seq-cell.on.current {
+            background: linear-gradient(135deg, #e0506a88, #e0506a55);
+            box-shadow: 0 0 8px #e0506a44;
+        }
+        .seq-cell.beat-marker {
+            border-bottom: 2px solid #252540;
+        }
+        /* Separateur visuel tous les 4 steps */
+        .seq-cell:nth-child(4n+1+1) { margin-left: 0; }
+        .seq-sep {
+            width: 4px;
+            flex-shrink: 0;
+        }
+
+        /* Step indicators en dessous */
+        .step-indicators {
+            display: flex;
+            gap: 2px;
+            padding-left: 70px;
+        }
+        .step-ind {
+            width: 28px;
+            text-align: center;
+            font-size: 7px;
+            color: #252540;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .step-ind.current { color: #e0506a; }
+
+        /* ── VU-metres ── */
+        .meters {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .meter-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .meter-lbl {
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #303060;
+            width: 40px;
+            flex-shrink: 0;
+        }
+        .meter-bar {
+            flex: 1;
+            height: 5px;
+            background: #111128;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .meter-fill {
+            height: 100%;
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.05s linear;
+        }
+        .meter-fill.bass   { background: linear-gradient(90deg, #e0506a, #ff8090); }
+        .meter-fill.mid    { background: linear-gradient(90deg, #506ae0, #8090ff); }
+        .meter-fill.treble { background: linear-gradient(90deg, #50e0a0, #80ffcc); }
+        .meter-fill.rms    { background: linear-gradient(90deg, #e0a050, #ffd080); }
+
+        /* ── Mappings ── */
+        .mappings-list {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .mapping-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .mapping-param {
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #50608a;
+            width: 64px;
+            flex-shrink: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .mapping-sel {
+            flex: 1;
+            background: #10102a;
+            border: 1px solid #1e1e42;
+            border-radius: 4px;
+            color: #5870c0;
+            font-size: 8px;
+            padding: 3px 4px;
+            cursor: pointer;
+        }
+        .mapping-sel:focus { outline: none; border-color: #3040a0; }
+
+        /* ── Statut ── */
+        .status {
+            font-size: 8.5px;
+            color: #252550;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            min-height: 14px;
+        }
+        .status.on  { color: #e0506a; }
+    </style>
+</head>
+<body>
+
+    <script type="module" src="./navbar.js"></script>
+    <app-navbar></app-navbar>
+
+    <h1>ISF Renderer — Sequenceur</h1>
+
+    <div class="layout">
+
+        <!-- Colonne gauche : shader -->
+        <div class="left-col">
+            <isf-renderer id="r" shader="pulse"></isf-renderer>
+        </div>
+
+        <!-- Colonne droite : controles -->
+        <div class="ctrl-panel">
+
+            <!-- Preset -->
+            <div class="panel-title">Kit de batterie</div>
+            <div class="preset-row">
+                <span class="preset-label">Preset</span>
+                <select class="preset-sel" id="preset-sel"></select>
+            </div>
+            <div class="loading-bar"><div class="loading-fill" id="loading-fill"></div></div>
+
+            <!-- Transport -->
+            <div class="panel-title">Transport</div>
+            <div class="transport">
+                <button class="transport-btn" id="btn-play" disabled>Play</button>
+                <button class="transport-btn" id="btn-stop" disabled>Stop</button>
+                <button class="transport-btn" id="btn-clear" disabled>Clear</button>
+                <div class="bpm-group">
+                    <span class="bpm-label">BPM</span>
+                    <input class="bpm-input" id="bpm-val" type="number" value="120" min="40" max="240">
+                    <input class="bpm-slider" id="bpm-slider" type="range" min="40" max="240" value="120">
+                </div>
+            </div>
+
+            <!-- Grille du sequenceur -->
+            <div class="panel-title">Grille</div>
+            <div class="seq-grid-wrap">
+                <div class="seq-grid" id="seq-grid"></div>
+                <div class="step-indicators" id="step-indicators"></div>
+            </div>
+
+            <!-- VU-metres -->
+            <div class="panel-title">Niveaux</div>
+            <div class="meters">
+                <div class="meter-row">
+                    <span class="meter-lbl">Bass</span>
+                    <div class="meter-bar"><div class="meter-fill bass" id="m-bass"></div></div>
+                </div>
+                <div class="meter-row">
+                    <span class="meter-lbl">Mid</span>
+                    <div class="meter-bar"><div class="meter-fill mid" id="m-mid"></div></div>
+                </div>
+                <div class="meter-row">
+                    <span class="meter-lbl">Treble</span>
+                    <div class="meter-bar"><div class="meter-fill treble" id="m-treble"></div></div>
+                </div>
+                <div class="meter-row">
+                    <span class="meter-lbl">RMS</span>
+                    <div class="meter-bar"><div class="meter-fill rms" id="m-rms"></div></div>
+                </div>
+            </div>
+
+            <!-- Mappings audio → shader -->
+            <div class="panel-title">Mappings Param → Audio</div>
+            <div class="mappings-list" id="mappings-list">
+                <span style="font-size:8px;color:#252550">Chargement du shader…</span>
+            </div>
+
+            <div class="status" id="status">arrete</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { ISFRenderer } from './isf-renderer.js';
+        import { Sequencer, DRUM_PRESETS } from './sequencer.js';
+
+        // ── Refs DOM ──────────────────────────────────────────────────────────
+        const renderer     = document.getElementById('r');
+        const presetSel    = document.getElementById('preset-sel');
+        const loadingFill  = document.getElementById('loading-fill');
+        const btnPlay      = document.getElementById('btn-play');
+        const btnStop      = document.getElementById('btn-stop');
+        const btnClear     = document.getElementById('btn-clear');
+        const bpmVal       = document.getElementById('bpm-val');
+        const bpmSlider    = document.getElementById('bpm-slider');
+        const gridEl       = document.getElementById('seq-grid');
+        const stepsEl      = document.getElementById('step-indicators');
+        const statusEl     = document.getElementById('status');
+        const mappingsList = document.getElementById('mappings-list');
+
+        const FEATURES = ['none', 'bass', 'mid', 'treble', 'rms', 'peak'];
+
+        let mappings = {};
+        let seq      = null;
+        let cells    = [];   // cells[pad][step] = HTMLElement
+        let stepInds = [];
+
+        // ── Remplir le selecteur de presets ────────────────────────────────────
+        for (const p of DRUM_PRESETS) {
+            const opt = document.createElement('option');
+            opt.value = p.category;
+            opt.textContent = p.name;
+            presetSel.appendChild(opt);
+        }
+
+        // ── Charger un preset ─────────────────────────────────────────────────
+        async function loadPreset(category) {
+            btnPlay.disabled = btnStop.disabled = btnClear.disabled = true;
+            loadingFill.style.width = '0%';
+            statusEl.className = 'status';
+            statusEl.textContent = 'chargement…';
+
+            if (!seq) seq = new Sequencer();
+
+            seq.onStep(stepIndex => {
+                highlightStep(stepIndex);
+            });
+
+            await seq.loadPreset(category, (pct, name) => {
+                loadingFill.style.width = (pct * 100) + '%';
+            });
+
+            buildGrid();
+            btnPlay.disabled = btnStop.disabled = btnClear.disabled = false;
+            statusEl.textContent = 'pret';
+        }
+
+        presetSel.addEventListener('change', () => loadPreset(presetSel.value));
+
+        // ── Construire la grille UI ───────────────────────────────────────────
+        function buildGrid() {
+            gridEl.innerHTML = '';
+            stepsEl.innerHTML = '';
+            cells = [];
+            stepInds = [];
+
+            const sounds = seq.sounds;
+
+            for (let p = 0; p < sounds.length; p++) {
+                const row = document.createElement('div');
+                row.className = 'seq-row';
+
+                const lbl = document.createElement('span');
+                lbl.className = 'pad-label';
+                lbl.textContent = (sounds[p].name || sounds[p].id || `pad ${p}`).toUpperCase();
+                lbl.title = sounds[p].name || '';
+                row.appendChild(lbl);
+
+                const rowCells = [];
+
+                for (let s = 0; s < seq.steps; s++) {
+                    // Separateur tous les 4 steps
+                    if (s > 0 && s % 4 === 0) {
+                        const sep = document.createElement('div');
+                        sep.className = 'seq-sep';
+                        row.appendChild(sep);
+                    }
+
+                    const cell = document.createElement('div');
+                    cell.className = 'seq-cell';
+                    cell.addEventListener('click', () => {
+                        const on = seq.toggle(p, s);
+                        cell.classList.toggle('on', on);
+                    });
+
+                    // Previsualisation : clic droit = jouer le son
+                    cell.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        seq.engine.playSingle(seq.category, p);
+                    });
+
+                    row.appendChild(cell);
+                    rowCells.push(cell);
+                }
+
+                gridEl.appendChild(row);
+                cells.push(rowCells);
+            }
+
+            // Indicateurs de step
+            for (let s = 0; s < seq.steps; s++) {
+                if (s > 0 && s % 4 === 0) {
+                    const sep = document.createElement('div');
+                    sep.className = 'seq-sep';
+                    stepsEl.appendChild(sep);
+                }
+                const ind = document.createElement('span');
+                ind.className = 'step-ind';
+                ind.textContent = s + 1;
+                stepsEl.appendChild(ind);
+                stepInds.push(ind);
+            }
+        }
+
+        function highlightStep(step) {
+            // Effacer tous les marqueurs "current"
+            for (const row of cells) {
+                for (const c of row) c.classList.remove('current');
+            }
+            for (const ind of stepInds) ind.classList.remove('current');
+
+            // Marquer le step courant
+            for (const row of cells) {
+                if (row[step]) row[step].classList.add('current');
+            }
+            if (stepInds[step]) stepInds[step].classList.add('current');
+        }
+
+        // ── Transport ─────────────────────────────────────────────────────────
+        btnPlay.addEventListener('click', () => {
+            if (!seq) return;
+            if (seq.playing) return;
+            seq.play();
+            btnPlay.classList.add('playing');
+            statusEl.className = 'status on';
+            statusEl.textContent = '▶ lecture';
+        });
+
+        btnStop.addEventListener('click', () => {
+            if (!seq) return;
+            seq.stop();
+            btnPlay.classList.remove('playing');
+            statusEl.className = 'status';
+            statusEl.textContent = 'arrete';
+            // Effacer les marqueurs
+            for (const row of cells) {
+                for (const c of row) c.classList.remove('current');
+            }
+            for (const ind of stepInds) ind.classList.remove('current');
+        });
+
+        btnClear.addEventListener('click', () => {
+            if (!seq) return;
+            seq.clear();
+            for (const row of cells) {
+                for (const c of row) c.classList.remove('on');
+            }
+        });
+
+        // BPM
+        bpmSlider.addEventListener('input', () => {
+            bpmVal.value = bpmSlider.value;
+            if (seq) seq.setBpm(parseInt(bpmSlider.value));
+        });
+        bpmVal.addEventListener('change', () => {
+            const v = Math.max(40, Math.min(240, parseInt(bpmVal.value) || 120));
+            bpmVal.value = v;
+            bpmSlider.value = v;
+            if (seq) seq.setBpm(v);
+        });
+
+        // ── Mappings audio → shader ───────────────────────────────────────────
+        renderer.addEventListener('shaderloaded', () => {
+            buildMappingUI(renderer.inputsMeta);
+        });
+
+        function buildMappingUI(inputs) {
+            mappings = {};
+            mappingsList.innerHTML = '';
+
+            const numeric = inputs.filter(i => i.TYPE === 'float' || i.TYPE === 'long');
+            if (numeric.length === 0) {
+                mappingsList.innerHTML = '<span style="font-size:8px;color:#252550">Pas de parametres numeriques</span>';
+                return;
+            }
+
+            // Mappings par defaut
+            const defaults = {
+                rings:  'rms',
+                radius: 'bass',
+                glow:   'mid',
+                speed:  'treble',
+            };
+
+            for (const input of numeric) {
+                const row = document.createElement('div');
+                row.className = 'mapping-row';
+
+                const lbl = document.createElement('span');
+                lbl.className = 'mapping-param';
+                lbl.textContent = (input.LABEL ?? input.NAME).toUpperCase();
+                lbl.title = input.NAME;
+
+                const sel = document.createElement('select');
+                sel.className = 'mapping-sel';
+                for (const feat of FEATURES) {
+                    const opt = document.createElement('option');
+                    opt.value = feat;
+                    opt.textContent = feat === 'none' ? '— aucun —' : feat.toUpperCase();
+                    sel.appendChild(opt);
+                }
+                sel.value = defaults[input.NAME] ?? 'none';
+                mappings[input.NAME] = sel.value;
+
+                sel.addEventListener('change', () => {
+                    mappings[input.NAME] = sel.value;
+                });
+
+                row.appendChild(lbl);
+                row.appendChild(sel);
+                mappingsList.appendChild(row);
+            }
+        }
+
+        // ── Boucle rAF : features audio → shader ─────────────────────────────
+        function loop() {
+            requestAnimationFrame(loop);
+            if (!seq) return;
+
+            seq.tick();
+            const f = seq.features;
+
+            // Mettre a jour les VU-metres
+            document.getElementById('m-bass').style.width   = (f.bass   * 100) + '%';
+            document.getElementById('m-mid').style.width    = (f.mid    * 100) + '%';
+            document.getElementById('m-treble').style.width = (f.treble * 100) + '%';
+            document.getElementById('m-rms').style.width    = (f.rms    * 100) + '%';
+
+            // Appliquer les mappings aux parametres du shader
+            for (const [param, feat] of Object.entries(mappings)) {
+                if (feat === 'none') continue;
+                const raw  = f[feat] ?? 0;
+                const meta = renderer.inputsMeta.find(i => i.NAME === param);
+                if (!meta) continue;
+                const min = meta.MIN ?? 0;
+                const max = meta.MAX ?? 1;
+                renderer.setParam(param, min + raw * (max - min));
+            }
+        }
+        requestAnimationFrame(loop);
+
+        // ── Charger le premier preset au demarrage ────────────────────────────
+        loadPreset(DRUM_PRESETS[0].category);
+    </script>
+
+</body>
+</html>

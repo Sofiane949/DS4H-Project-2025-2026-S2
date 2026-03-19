@@ -1,0 +1,22 @@
+<div class="app-container">
+  <nav class="app-nav">
+    <a [href]="backendUrl" target="_blank">Accueil</a>
+    <a [href]="backendUrl + '/sampler/'" target="_blank">Sampler</a>
+    <a [href]="backendUrl + '/ex4/'" target="_blank">Sequencer</a>
+  </nav>
+
+  <header class="app-header">
+    <h1>{{ title }}</h1>
+    <p class="subtitle">Interface d'administration des presets du Sampler</p>
+  </header>
+
+  <main class="app-main">
+    <app-preset-list></app-preset-list>
+  </main>
+
+  <footer class="app-footer">
+    <p>Sampler Admin - Angular | Backend: <a [href]="backendUrl" target="_blank">{{ backendUrl }}</a></p>
+  </footer>
+</div>
+
+<router-outlet></router-outlet>

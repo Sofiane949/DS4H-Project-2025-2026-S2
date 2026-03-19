@@ -1,0 +1,6 @@
+node_modules/
+.DS_Store
+presets.zip
+AngularSamplerAudio/sampler-main/node_modules/
+AngularSamplerAudio/sampler-main/presets.zip
+AngularSamplerAudio/sampler-main/.env

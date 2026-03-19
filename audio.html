@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISF Renderer — Audio Reactivity</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: #080812;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 28px;
+            padding: 0 20px 32px 20px;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            color: #6070a0;
+        }
+
+        h1 {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2.5px;
+            color: #404070;
+        }
+
+        /* ── Main layout ── */
+        .layout {
+            display: flex;
+            gap: 24px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        isf-renderer { width: min(500px, 90vw); }
+
+        /* ── Audio controller panel ── */
+        .audio-panel {
+            background: #0d0d22;
+            border: 1px solid #1e1e40;
+            border-radius: 8px;
+            padding: 18px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            min-width: 220px;
+            max-width: 280px;
+        }
+
+        .panel-title {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #303060;
+            border-bottom: 1px solid #1a1a38;
+            padding-bottom: 8px;
+        }
+
+        /* Source buttons */
+        .source-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .src-btn {
+            background: #12122a;
+            border: 1px solid #22224a;
+            border-radius: 5px;
+            color: #5060a0;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 7px 4px;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .src-btn:hover    { background: #1a1a38; border-color: #3a3a80; color: #8898e0; }
+        .src-btn.active   { background: #1e0a14; border-color: #c03050; color: #e0506a; }
+        .src-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* VU meters */
+        .meters {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .meter-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .meter-lbl {
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #303060;
+            width: 40px;
+            flex-shrink: 0;
+        }
+        .meter-bar {
+            flex: 1;
+            height: 6px;
+            background: #111128;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .meter-fill {
+            height: 100%;
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.04s linear;
+        }
+        .meter-fill.bass   { background: linear-gradient(90deg, #e0506a, #ff8090); }
+        .meter-fill.mid    { background: linear-gradient(90deg, #506ae0, #8090ff); }
+        .meter-fill.treble { background: linear-gradient(90deg, #50e0a0, #80ffcc); }
+        .meter-fill.rms    { background: linear-gradient(90deg, #e0a050, #ffd080); }
+
+        /* Mappings table */
+        .mappings-title {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #303060;
+            border-bottom: 1px solid #1a1a38;
+            padding-bottom: 6px;
+        }
+
+        .mappings-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .mapping-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .mapping-param {
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #50608a;
+            width: 64px;
+            flex-shrink: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .mapping-sel {
+            flex: 1;
+            background: #10102a;
+            border: 1px solid #1e1e42;
+            border-radius: 4px;
+            color: #5870c0;
+            font-size: 8px;
+            padding: 3px 4px;
+            cursor: pointer;
+        }
+        .mapping-sel:focus { outline: none; border-color: #3040a0; }
+
+        /* Status line */
+        .status {
+            font-size: 8.5px;
+            color: #252550;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            min-height: 14px;
+        }
+        .status.on  { color: #e0506a; }
+        .status.err { color: #c04040; }
+    </style>
+</head>
+<body>
+
+    <script type="module" src="./navbar.js"></script>
+    <app-navbar></app-navbar>
+
+    <h1 style="margin-top:24px">ISF Renderer — Audio Reactivity</h1>
+
+    <div class="layout">
+
+        <!-- Single renderer panel -->
+        <isf-renderer id="r" shader="pulse"></isf-renderer>
+
+        <!-- Audio controller -->
+        <div class="audio-panel">
+
+            <div class="panel-title">Audio Source</div>
+
+            <div class="source-grid">
+                <button class="src-btn" data-src="bass"  >Bass Drone</button>
+                <button class="src-btn" data-src="arp"   >Arp</button>
+                <button class="src-btn" data-src="beat"  >Beat</button>
+                <button class="src-btn" data-src="noise" >Noise</button>
+                <button class="src-btn" data-src="mic" style="grid-column:1/-1">Microphone</button>
+            </div>
+
+            <div class="meters">
+                <div class="panel-title" style="border:none;padding:0">Levels</div>
+                <div class="meter-row">
+                    <span class="meter-lbl">Bass</span>
+                    <div class="meter-bar"><div class="meter-fill bass"   id="m-bass"></div></div>
+                </div>
+                <div class="meter-row">
+                    <span class="meter-lbl">Mid</span>
+                    <div class="meter-bar"><div class="meter-fill mid"    id="m-mid"></div></div>
+                </div>
+                <div class="meter-row">
+                    <span class="meter-lbl">Treble</span>
+                    <div class="meter-bar"><div class="meter-fill treble" id="m-treble"></div></div>
+                </div>
+                <div class="meter-row">
+                    <span class="meter-lbl">RMS</span>
+                    <div class="meter-bar"><div class="meter-fill rms"    id="m-rms"></div></div>
+                </div>
+            </div>
+
+            <div>
+                <div class="mappings-title">Param Mappings</div>
+                <div class="mappings-list" id="mappings-list">
+                    <span style="font-size:8px;color:#252550">Loading shader…</span>
+                </div>
+            </div>
+
+            <div class="status" id="status">stopped</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { ISFRenderer } from './isf-renderer.js';
+        import { AudioEngine  } from './audio-engine.js';
+
+        const renderer   = document.getElementById('r');
+        const statusEl   = document.getElementById('status');
+        const mappingsList = document.getElementById('mappings-list');
+
+        const FEATURES   = ['none', 'bass', 'mid', 'treble', 'rms', 'peak'];
+
+        // Feature → param mappings: { paramName: featureKey }
+        let mappings     = {};
+        let engine       = null;
+        let animId       = null;
+
+        // ── Build mapping UI once shader is loaded ─────────────────────────
+        renderer.addEventListener('shaderloaded', () => {
+            buildMappingUI(renderer.inputsMeta);
+        });
+
+        function buildMappingUI(inputs) {
+            mappings = {};
+            mappingsList.innerHTML = '';
+
+            const numeric = inputs.filter(i => i.TYPE === 'float' || i.TYPE === 'long');
+            if (numeric.length === 0) {
+                mappingsList.innerHTML = '<span style="font-size:8px;color:#252550">No numeric params</span>';
+                return;
+            }
+
+            // Default sensible mappings for pulse shader
+            const defaults = {
+                rings:  'rms',
+                radius: 'bass',
+                glow:   'mid',
+                speed:  'treble',
+            };
+
+            for (const input of numeric) {
+                const row = document.createElement('div');
+                row.className = 'mapping-row';
+
+                const lbl = document.createElement('span');
+                lbl.className   = 'mapping-param';
+                lbl.textContent = (input.LABEL ?? input.NAME).toUpperCase();
+                lbl.title       = input.NAME;
+
+                const sel = document.createElement('select');
+                sel.className = 'mapping-sel';
+                for (const feat of FEATURES) {
+                    const opt = document.createElement('option');
+                    opt.value       = feat;
+                    opt.textContent = feat === 'none' ? '— none —' : feat.toUpperCase();
+                    sel.appendChild(opt);
+                }
+                sel.value = defaults[input.NAME] ?? 'none';
+                mappings[input.NAME] = sel.value;
+
+                sel.addEventListener('change', () => {
+                    mappings[input.NAME] = sel.value;
+                });
+
+                row.appendChild(lbl);
+                row.appendChild(sel);
+                mappingsList.appendChild(row);
+            }
+        }
+
+        // ── rAF loop ───────────────────────────────────────────────────────
+        function loop() {
+            animId = requestAnimationFrame(loop);
+            if (!engine) return;
+
+            engine.tick();
+            const f = engine.features;
+
+            // Update VU meters
+            document.getElementById('m-bass').style.width   = (f.bass   * 100) + '%';
+            document.getElementById('m-mid').style.width    = (f.mid    * 100) + '%';
+            document.getElementById('m-treble').style.width = (f.treble * 100) + '%';
+            document.getElementById('m-rms').style.width    = (f.rms    * 100) + '%';
+
+            // Apply mappings → renderer params (silently, no events)
+            for (const [param, feat] of Object.entries(mappings)) {
+                if (feat === 'none') continue;
+                const raw   = f[feat] ?? 0;
+                const meta  = renderer.inputsMeta.find(i => i.NAME === param);
+                if (!meta) continue;
+                const min   = meta.MIN  ?? 0;
+                const max   = meta.MAX  ?? 1;
+                renderer.setParam(param, min + raw * (max - min));
+            }
+        }
+        animId = requestAnimationFrame(loop);
+
+        // ── Source buttons ─────────────────────────────────────────────────
+        document.querySelectorAll('.src-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const srcId = btn.dataset.src;
+
+                // Activate on first click (requires user gesture for AudioContext)
+                if (!engine) {
+                    engine = new AudioEngine();
+                    try {
+                        await engine.start(srcId);
+                        setActiveBtn(btn);
+                        setStatus('on', `▶ ${srcId}`);
+                    } catch (err) {
+                        setStatus('err', err.message);
+                    }
+                    return;
+                }
+
+                // Already running — switch source
+                const wasActive = btn.classList.contains('active');
+                if (wasActive) {
+                    // Toggle off
+                    await engine.stop();
+                    engine = null;
+                    clearActiveBtn();
+                    setStatus('', 'stopped');
+                } else {
+                    try {
+                        await engine.switch(srcId);
+                        setActiveBtn(btn);
+                        setStatus('on', `▶ ${srcId}`);
+                    } catch (err) {
+                        setStatus('err', err.message);
+                    }
+                }
+            });
+        });
+
+        function setActiveBtn(btn) {
+            document.querySelectorAll('.src-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+        function clearActiveBtn() {
+            document.querySelectorAll('.src-btn').forEach(b => b.classList.remove('active'));
+        }
+        function setStatus(cls, msg) {
+            statusEl.className = 'status ' + cls;
+            statusEl.textContent = msg;
+        }
+    </script>
+
+</body>
+</html>

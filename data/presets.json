@@ -1,0 +1,38 @@
+[
+  {
+    "id": "40ab11fa-3649-43cf-aea2-92c73e0ebe0d",
+    "name": "8x8 Default",
+    "shader": "checkerboard",
+    "params": {
+      "rows": 8,
+      "cols": 8,
+      "speed": 0,
+      "invert": false
+    },
+    "createdAt": "2026-03-19T12:58:16.145Z"
+  },
+  {
+    "id": "7139c45d-8ded-4527-8680-662266f5f0d9",
+    "name": "Fast scroll",
+    "shader": "checkerboard",
+    "params": {
+      "rows": 12,
+      "cols": 12,
+      "speed": 2.5,
+      "invert": false
+    },
+    "createdAt": "2026-03-19T12:58:16.177Z"
+  },
+  {
+    "id": "5558ac05-cf4c-4314-805f-7a57deefb0b9",
+    "name": "Warm invert",
+    "shader": "colorize",
+    "params": {
+      "invertAmt": 1,
+      "hue": 0.08,
+      "saturation": 0.3,
+      "brightness": 0
+    },
+    "createdAt": "2026-03-19T12:58:16.209Z"
+  }
+]
