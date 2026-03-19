@@ -1,0 +1,24 @@
+{
+  "name": "babylonjs-video-wam",
+  "version": "1.0.0",
+  "description": "Mon composant Babylon.js pour WAM Jam Party",
+  "author": "Sofiane",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "webpack"
+  },
+  "dependencies": {
+    "babylonjs": "^5.0.0",
+    "@webaudiomodules/api": "webaudiomodules/api#d12879535761e27c6e475e84e799b8e43cc97e76",
+    "@webaudiomodules/sdk": "webaudiomodules/sdk#54ce5c93e0dea780525c79654393027cc287cb97",
+    "wam-extensions": "boourns/wam-extensions#bdca7553c4c3441998c91b91ee52e063e45effe3"
+  },
+  "devDependencies": {
+    "webpack": "^5.90.0",
+    "webpack-cli": "^5.1.0",
+    "ts-loader": "^9.5.0",
+    "typescript": "^5.0.0"
+  }
+}
