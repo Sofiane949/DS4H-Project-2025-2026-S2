@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ISF Shader Renderer Prototype</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f3f4ef;
+        --panel: #ffffff;
+        --ink: #1f2b20;
+        --accent: #0f766e;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, sans-serif;
+        background: radial-gradient(circle at 20% 10%, #fff, var(--bg));
+        color: var(--ink);
+      }
+
+      .page {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      .header {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid #d6ddd5;
+        border-radius: 14px;
+        padding: 16px;
+      }
+
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      #chain {
+        margin-top: 16px;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="header">
+        <h1>Prototype ISF Shader Renderer</h1>
+
+      </section>
+
+      <section class="card row">
+        <audio id="player" controls style="width: 420px"></audio>
+        <input id="audio-file" type="file" accept="audio/*" />
+        <button id="resume-audio">Activer AudioContext</button>
+        <button id="mic-toggle">Activer Micro</button>
+        <span id="audio-status" style="font-size: 12px; color: #3c5243">Choisis un fichier audio local.</span>
+      </section>
+
+      <section id="chain">
+        <isf-shader-renderer id="shaderA" shader="./shaders/audio-grid-3d.fs" width="960" height="540"></isf-shader-renderer>
+      </section>
+    </main>
+
+    <script type="module" src="./isf-shader-renderer.js"></script>
+    <script type="module">
+      const player = document.getElementById("player");
+      const shaderA = document.getElementById("shaderA");
+      const resumeButton = document.getElementById("resume-audio");
+      const micToggleButton = document.getElementById("mic-toggle");
+      const audioFileInput = document.getElementById("audio-file");
+      const audioStatus = document.getElementById("audio-status");
+
+      shaderA.connectAudio(player);
+
+      let objectUrl;
+      let micEnabled = false;
+
+      if (!shaderA.microphoneSupported || !shaderA.microphoneSupported()) {
+        micToggleButton.disabled = true;
+        audioStatus.textContent = "Micro indisponible: getUserMedia non supporte.";
+      }
+
+      audioFileInput.addEventListener("change", async (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+
+        if (objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+        }
+
+        objectUrl = URL.createObjectURL(file);
+        player.src = objectUrl;
+        player.load();
+        audioStatus.textContent = `Fichier charge: ${file.name}`;
+      });
+
+      player.addEventListener("error", () => {
+        audioStatus.textContent = "Erreur audio: fichier non lisible.";
+      });
+
+      resumeButton.addEventListener("click", async () => {
+        await shaderA.resumeAudio();
+        const playResult = await player.play().catch(() => undefined);
+        if (playResult === undefined && !player.src) {
+          audioStatus.textContent = "Aucun audio: choisis un fichier local.";
+        }
+      });
+
+      micToggleButton.addEventListener("click", async () => {
+        if (!micEnabled) {
+          try {
+            await shaderA.connectMicrophone();
+            micEnabled = true;
+            micToggleButton.textContent = "Couper Micro";
+            audioStatus.textContent = "Micro actif: parle pour piloter le shader.";
+          } catch (error) {
+            const name = error && error.name ? error.name : "Erreur";
+            const message = error && error.message ? error.message : "inconnue";
+            if (name === "NotAllowedError") {
+              audioStatus.textContent = "Micro refuse: autorise le micro dans le navigateur (icone cadenas).";
+            } else if (name === "NotFoundError") {
+              audioStatus.textContent = "Aucun micro detecte sur cette machine.";
+            } else if (name === "NotReadableError") {
+              audioStatus.textContent = "Micro occupe par une autre application.";
+            } else if (name === "SecurityError") {
+              audioStatus.textContent = "Contexte non securise: utilise localhost/127.0.0.1 en http local.";
+            } else {
+              audioStatus.textContent = `Micro erreur (${name}): ${message}`;
+            }
+          }
+          return;
+        }
+
+        shaderA.stopMicrophone();
+        micEnabled = false;
+        micToggleButton.textContent = "Activer Micro";
+        audioStatus.textContent = "Micro coupe.";
+      });
+    </script>
+  </body>
+</html>
