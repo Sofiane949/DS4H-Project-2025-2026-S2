@@ -1,5 +1,6 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
+import webpack from 'webpack';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -7,7 +8,6 @@ const __dirname = path.dirname(__filename);
 export default {
   entry: './src/index.tsx',
   mode: 'development',
-  devtool: 'source-map',
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'index.js',
@@ -20,6 +20,10 @@ export default {
   },
   resolve: {
     extensions: ['.ts', '.tsx', '.js'],
+    alias: {
+        // Force l'utilisation du fichier complet de Babylon
+        'babylonjs': path.resolve(__dirname, 'node_modules/babylonjs/babylon.js')
+    }
   },
   module: {
     rules: [
@@ -30,8 +34,10 @@ export default {
       },
     ],
   },
-  externals: {
-    // On ne bundle pas Babylon pour gagner de la place (il sera chargé par l'hôte)
-    'babylonjs': 'BABYLON'
-  }
+  plugins: [
+    // On s'assure que BABYLON est défini globalement dans le bundle
+    new webpack.ProvidePlugin({
+      BABYLON: 'babylonjs'
+    })
+  ]
 };

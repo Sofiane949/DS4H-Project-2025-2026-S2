@@ -1,32 +1,26 @@
 const getBabylonProcessor = (moduleId: string) => {
-	// Utilisation de any pour éviter l'erreur de namespace TS2709
-	const audioWorkletGlobalScope: any = globalThis as any;
-	const ModuleScope = audioWorkletGlobalScope.webAudioModules.getModuleScope(moduleId);
+	const audioWorkletGlobalScope: any = globalThis;
+	const id = "com.webaudiomodule.default"; // On force l'ID attendu par l'hôte
 
-	const WamProcessor = ModuleScope.WamProcessor;
-	const DynamicParameterProcessor = ModuleScope.DynamicParameterProcessor;
+	const ModuleScope = audioWorkletGlobalScope.webAudioModules.getModuleScope(id);
+	const WamProcessor = ModuleScope.WamProcessor || audioWorkletGlobalScope.WamProcessor;
 
-	class BabylonProcessor extends DynamicParameterProcessor {
+	if (!WamProcessor) return;
+
+	class BabylonProcessor extends WamProcessor {
 		_process(startSample: number, endSample: number, inputs: Float32Array[][], outputs: Float32Array[][]) {
-			if (inputs.length != outputs.length) return;
-			for (let i = 0; i < inputs.length; i++) {
-				for (let j = 0; j < inputs[i].length; j++) {
-					for (let k = 0; k < inputs[i][j].length; k++) {
-						outputs[i][j][k] = inputs[i][j][k]
-					}
+			if (!inputs[0] || !outputs[0]) return;
+			for (let i = 0; i < inputs[0].length; i++) {
+				if (outputs[0][i] && inputs[0][i]) {
+					outputs[0][i].set(inputs[0][i]);
 				}
 			}
-			return;
 		}
 	}
 
 	try {
-		audioWorkletGlobalScope.registerProcessor(moduleId, BabylonProcessor as any);
-	} catch (error) {
-		console.warn(error);
-	}
-
-	return BabylonProcessor
+		audioWorkletGlobalScope.registerProcessor(id, BabylonProcessor);
+	} catch (e) { }
 }
 
 export default getBabylonProcessor;
