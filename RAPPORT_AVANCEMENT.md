@@ -1,16 +1,16 @@
 # Journal d'Avancement Individuel : Projet WebXR Shaders
-**Projet DS4H 2025-2026**
+
+**Projet DS4H 2025-2026**  
 **Encadrant :** Michel Buffa
 
 ---
 
-## 👤 Sofiane : Intégration 3D, Framework WAM & DevOps
+## Sofiane
 
 **Semaine 1 : Recherche et Prototypage**
 *   **Veille Technologique :** Étude approfondie du framework **Web Audio Modules (WAM)** et des extensions vidéo.
 *   **Build Système :** Installation de l'environnement et réussite de la compilation locale du dépôt original de Tom Burns (`burns-audio-wam`).
-*   **Prototypes Babylon.js :** Création d'une série d'exemples (`babylonjs_shaders_example`) appliquant des shaders provenant de **Shadertoy** sur des formes 3D (Box, Sphere, Torus) via des
-    `ShaderMaterial` et `ProceduralTextures`.
+*   **Prototypes Babylon.js :** Création d'une série d'exemples (`babylonjs_shaders_example`) appliquant des shaders provenant de **Shadertoy** sur des formes 3D (Box, Sphere, Torus) via des `ShaderMaterial` et `ProceduralTextures`.
 
 **Semaine 2 : Architecture du Plugin WAM**
 *   **Conception du Plugin :** Création du dossier `video_babylonjs` et définition de la structure WAM (Runner, Processor, GUI).
@@ -27,7 +27,7 @@
 
 ---
 
-## 👤 Adel : Architecture Séquenceur, UI & Backend
+## Adel
 
 **Semaine 1 : Analyse Fonctionnelle**
 *   **Exploration Hôte :** Test et analyse du fonctionnement de [sequencer.party](https://sequencer.party) pour identifier les mécanismes de déclenchement audio-visuel.
@@ -45,7 +45,7 @@
 
 ---
 
-## 👤 Amir : Pipeline Shaders ISF & Analyse Audio
+## Amir
 
 **Semaine 1 : Spécifications ISF**
 *   **Étude du Format :** Recherche sur la norme **Interactive Shader Format (ISF)** et son parseur de métadonnées JSON.
