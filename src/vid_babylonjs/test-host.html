@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Hôte Babylon.js + WAM</title>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; color: white; font-family: sans-serif; }
+        canvas { width: 100vw; height: 100vh; display: block; }
+        #ui { position: absolute; top: 20px; left: 20px; z-index: 10; background: rgba(0,0,0,0.7); padding: 20px; border-radius: 10px; border: 1px solid #00ffcc; }
+        button { background: #00ffcc; border: none; padding: 10px 20px; cursor: pointer; font-weight: bold; border-radius: 5px; color: black; }
+        button:hover { background: #00ccaa; }
+        #wam-status { margin-top: 10px; font-style: italic; color: #00ffcc; }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <h2>Hôte Babylon.js</h2>
+        <p>Ce cube sera contrôlé par le Web Audio Module (WAM).</p>
+        <button id="startBtn">DÉMARRER L'AUDIO & CHARGER WAM</button>
+        <div id="wam-status">En attente d'interaction...</div>
+    </div>
+
+    <canvas id="renderCanvas"></canvas>
+
+    <script type="module">
+        const canvas = document.getElementById("renderCanvas");
+        const engine = new BABYLON.Engine(canvas, true);
+
+        const createScene = () => {
+            const scene = new BABYLON.Scene(engine);
+            scene.clearColor = new BABYLON.Color4(0.05, 0.05, 0.05, 1);
+            const camera = new BABYLON.ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 2.5, 10, BABYLON.Vector3.Zero(), scene);
+            camera.attachControl(canvas, true);
+            const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+            light.intensity = 0.8;
+            const cube = BABYLON.MeshBuilder.CreateBox("targetCube", { size: 3 }, scene);
+            const mat = new BABYLON.StandardMaterial("cubeMat", scene);
+            mat.diffuseColor = new BABYLON.Color3(0.4, 0.4, 0.4);
+            cube.material = mat;
+            return { scene, cube };
+        };
+
+        const { scene, cube } = createScene();
+        engine.runRenderLoop(() => { scene.render(); });
+        window.addEventListener("resize", () => { engine.resize(); });
+
+        document.getElementById("startBtn").addEventListener("click", async () => {
+            const statusDiv = document.getElementById("wam-status");
+            statusDiv.innerText = "Initialisation...";
+
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                await audioCtx.resume();
+
+                // Chargement du module
+                const { default: VideoBabylonJS } = await import('./dist/index.js?t=' + Date.now());
+                
+                // Utilisation de la méthode officielle createInstance
+                // C'est cette méthode qui gère correctement le cycle de vie du WebAudioModule
+                const wam = await VideoBabylonJS.createInstance(audioCtx);
+                
+                // Création du noeud
+                const node = await wam.createAudioNode();
+
+                // Connexion micro
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const mic = audioCtx.createMediaStreamSource(stream);
+                mic.connect(node);
+                
+                // Liaison Babylon
+                if (typeof wam.attachToMesh === 'function') {
+                    wam.attachToMesh(scene, cube);
+                    statusDiv.innerText = "WAM CONNECTÉ !";
+                    document.getElementById("startBtn").style.display = "none";
+                }
+
+            } catch (err) {
+                console.error("ERREUR:", err);
+                statusDiv.innerText = "Erreur: " + err.message;
+            }
+        });
+    </script>
+</body>
+</html>
