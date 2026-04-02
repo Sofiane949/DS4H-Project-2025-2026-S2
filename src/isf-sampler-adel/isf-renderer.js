@@ -320,6 +320,10 @@ class ISFRenderer extends HTMLElement {
         this._backendOnline     = false;
     }
 
+    get canvas() { 
+        return this._canvas || (this.shadowRoot && this.shadowRoot.querySelector('canvas')); 
+    }
+
     // ── Observed attributes ────────────────────────────────────────────────
 
     static get observedAttributes() {
@@ -455,7 +459,7 @@ class ISFRenderer extends HTMLElement {
     // ── WebGL initialisation ───────────────────────────────────────────────
 
     _initWebGL() {
-        const gl = this._canvas.getContext('webgl2');
+        const gl = this._canvas.getContext('webgl2', { preserveDrawingBuffer: true });
         if (!gl) {
             this._log('WebGL 2 is not supported in this browser.', 'error');
             return;

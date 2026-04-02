@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
-    ``
-``: "./dist",
+    "outDir": "./dist",
     "sourceMap": true,
     "noImplicitAny": false,
     "module": "esnext",

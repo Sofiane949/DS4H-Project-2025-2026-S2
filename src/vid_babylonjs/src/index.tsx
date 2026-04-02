@@ -7,12 +7,45 @@ export default class VideoBabylonJS extends WebAudioModule<any> {
 	_runner: any
 	_node: any
 
+	// On surcharge createInstance pour injecter le contexte de façon chirurgicale
+	static async createInstance(audioContext: BaseAudioContext, initialState?: any) {
+		// @ts-ignore
+		const instance = new VideoBabylonJS();
+		
+		// Technique pour contourner le "getter-only" : on redéfinit la propriété
+		Object.defineProperty(instance, 'audioContext', {
+			value: audioContext,
+			configurable: true,
+			enumerable: true,
+			writable: true
+		});
+
+		// On fait pareil pour 'context' au cas où
+		Object.defineProperty(instance, 'context', {
+			value: audioContext,
+			configurable: true,
+			enumerable: true,
+			writable: true
+		});
+		
+		if (instance.initialize) {
+			await instance.initialize(initialState);
+		}
+		
+		return instance;
+	}
+
 	async createAudioNode(initialState?: any) {
-		// On force l'ID pour éviter les problèmes de descriptor.json manquant
+		const ctx = this.audioContext;
+		
+		if (!ctx) {
+			console.error("BABYLON WAM: AudioContext est toujours undefined malgré l'injection !");
+			throw new Error("Context initialization failed.");
+		}
+
 		const id = "video-babylon-wam";
 		(this as any)._moduleId = id;
 
-		// Injection manuelle du processeur (méthode la plus robuste)
 		const processorCode = `
 			registerProcessor('${id}', class extends AudioWorkletProcessor {
 				process(inputs, outputs) {
@@ -29,18 +62,30 @@ export default class VideoBabylonJS extends WebAudioModule<any> {
 		`;
 		
 		const url = "data:text/javascript;base64," + btoa(processorCode);
-		await this.audioContext.audioWorklet.addModule(url);
 		
-		// Création du noeud
-		const node = new (WamNode as any)(this, {
-			processorId: id,
-			initialState
-		});
+		try {
+			await ctx.audioWorklet.addModule(url);
+		} catch (e) {
+			console.log("Module déjà chargé");
+		}
+		
+		// Création du noeud avec une sécurité supplémentaire
+		let node;
+		try {
+			node = new (WamNode as any)(this, {
+				processorId: id,
+				initialState
+			});
+		} catch (e) {
+			console.warn("Échec constructeur WamNode standard, tentative alternative...");
+			node = new AudioWorkletNode(ctx, id, {
+				processorOptions: { moduleId: id, instanceId: (this as any).instanceId }
+			});
+		}
 
-		// Configuration de l'analyseur
-		const analyser = this.audioContext.createAnalyser();
+		const analyser = ctx.createAnalyser();
 		analyser.smoothingTimeConstant = 0.3;
-		node.analyser = analyser;
+		(node as any).analyser = analyser;
 		node.connect(analyser);
 
 		this._node = node;
@@ -64,7 +109,9 @@ export default class VideoBabylonJS extends WebAudioModule<any> {
 
 	async createGui() {
 		const div = document.createElement("div");
-		div.innerHTML = `<div style="color: #00ffcc; padding: 10px;">BABYLON WAM READY</div>`;
+		div.innerHTML = `<div style="color: #00ffcc; padding: 10px; background: #222; border: 1px solid #00ffcc; text-align:center;">
+			<b>BABYLON WAM ACTIVE</b><br>Audio Context OK
+		</div>`;
 		return div;
 	}
 }

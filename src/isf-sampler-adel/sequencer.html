@@ -349,6 +349,8 @@
         }
         .status.on  { color: #e0506a; }
     </style>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
 </head>
 <body>
 
@@ -360,8 +362,13 @@
     <div class="layout">
 
         <!-- Colonne gauche : shader -->
-        <div class="left-col">
+        <div class="left-col" style="display: flex; flex-direction: column; gap: 16px;">
             <isf-renderer id="r" shader="pulse"></isf-renderer>
+            
+            <div class="panel-title">Visualisation 3D (Babylon.js)</div>
+            <div class="canvas-wrap" style="aspect-ratio: 16/9; background: #000; border-radius: 8px; border: 1px solid #1e1e40;">
+                <canvas id="babylonCanvas" style="width: 100%; height: 100%; outline: none;"></canvas>
+            </div>
         </div>
 
         <!-- Colonne droite : controles -->
@@ -429,6 +436,7 @@
     <script type="module">
         import { ISFRenderer } from './isf-renderer.js';
         import { Sequencer, DRUM_PRESETS } from './sequencer.js';
+        import { BabylonBridge } from './babylon-bridge.js';
 
         // ── Refs DOM ──────────────────────────────────────────────────────────
         const renderer     = document.getElementById('r');
@@ -450,8 +458,22 @@
         let seq      = null;
         let cells    = [];   // cells[pad][step] = HTMLElement
         let stepInds = [];
+        let bridge3d = null;
 
-        // ── Remplir le selecteur de presets ────────────────────────────────────
+        async function init3D() {
+            await customElements.whenDefined('isf-renderer');
+            if (!bridge3d) {
+                bridge3d = new BabylonBridge('babylonCanvas', renderer);
+            }
+        }
+
+        init3D();
+
+        renderer.addEventListener('shaderloaded', () => {
+            init3D();
+            buildGrid();
+            buildMappingUI(renderer.inputsMeta);
+        });
         for (const p of DRUM_PRESETS) {
             const opt = document.createElement('option');
             opt.value = p.category;
@@ -681,6 +703,11 @@
                 const min = meta.MIN ?? 0;
                 const max = meta.MAX ?? 1;
                 renderer.setParam(param, min + raw * (max - min));
+            }
+
+            // Mettre a jour la réactivité 3D
+            if (bridge3d) {
+                bridge3d.updateAudioReactivity(f);
             }
         }
         requestAnimationFrame(loop);

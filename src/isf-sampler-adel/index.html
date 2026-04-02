@@ -70,6 +70,8 @@
             color: #4050a0;
         }
     </style>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
 </head>
 <body>
 
@@ -98,6 +100,15 @@
 
     </div>
 
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 16px; margin-top: 32px;">
+        <div class="panel-title" style="font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #303060; border-bottom: 1px solid #1a1a38; padding-bottom: 8px;">
+            Rendu 3D Final (Babylon.js)
+        </div>
+        <div class="canvas-wrap" style="aspect-ratio: 16/9; background: #000; border-radius: 8px; border: 1px solid #1e1e40; width: min(500px, 90vw);">
+            <canvas id="babylonCanvas" style="width: 100%; height: 100%; outline: none;"></canvas>
+        </div>
+    </div>
+
     <footer>
         r1.connect(r2) — r1 feeds its output into r2 as <code>inputImage</code><br>
         Adjust knobs in r1 (checkerboard parameters) and r2 (hue · saturation · invert)
@@ -105,9 +116,25 @@
 
     <script type="module">
         import { ISFRenderer } from './isf-renderer.js';
+        import { BabylonBridge } from './babylon-bridge.js';
 
         const r1 = document.getElementById('r1');
         const r2 = document.getElementById('r2');
+
+        let bridge3d = null;
+
+        async function init3D() {
+            await customElements.whenDefined('isf-renderer');
+            if (!bridge3d) {
+                bridge3d = new BabylonBridge('babylonCanvas', r2);
+            }
+        }
+
+        // On lance l'initialisation immédiatement (le bridge attendra le canvas si besoin)
+        init3D();
+
+        // Sécurité pour le rechargement de shader
+        r2.addEventListener('shaderloaded', init3D);
 
         // Wait for both to finish loading their shaders before chaining
         let r1Ready = false, r2Ready = false;
