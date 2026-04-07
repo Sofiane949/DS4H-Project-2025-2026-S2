@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>WAM ISF Visualizer - Split Mode</title>
+    <style>
+        body {
+            background: #0a0a0a;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            padding: 20px;
+        }
+
+        .workspace {
+            display: flex;
+            gap: 40px;
+            align-items: flex-start;
+            margin-top: 30px;
+        }
+
+        .panel {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .panel h2 {
+            font-size: 0.8rem;
+            color: #555;
+            text-transform: uppercase;
+            margin: 0;
+        }
+
+        /* La zone où le shader s'affiche (Simule le sol VR) */
+        #preview-zone {
+            width: 600px;
+            height: 450px;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid #222;
+            box-shadow: 0 0 30px rgba(0,123,255,0.2);
+        }
+
+        #preview-zone canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        #start-btn {
+            padding: 15px 40px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+
+        #start-btn:hover { transform: scale(1.05); }
+
+        .header { text-align: center; max-width: 600px; margin-bottom: 20px; }
+        .header p { color: #888; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Visualizer WAM </h1>
+    </div>
+
+    <button id="start-btn">DÉMARRER LE SYSTÈME</button>
+
+    <div class="workspace">
+        <!-- Zone WAM (Séquenceur / Rack) -->
+        <div class="panel">
+            <h2>WAM Plugin UI</h2>
+            <div id="wam-container"></div>
+        </div>
+
+        <!-- Zone de Rendu (Le "Sol" / VR) -->
+        <div class="panel">
+            <h2>Visual Output (VR Surface)</h2>
+            <div id="preview-zone"></div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="ISFRenderer.js"></script>
+    <script src="Gui.js"></script>
+    <script src="main.js"></script>
+
+    <script>
+        const btn = document.getElementById('start-btn');
+        const wamContainer = document.getElementById('wam-container');
+
+        btn.addEventListener('click', () => {
+            btn.style.display = 'none';
+            
+            // Le code dans main.js s'occupe du reste,
+            // mais on s'assure que le gui va dans wam-container
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.tagName === 'ISF-VISUALIZER-GUI') {
+                            wamContainer.appendChild(node);
+                        }
+                    });
+                });
+            });
+
+            observer.observe(document.body, { childList: true });
+        });
+    </script>
+</body>
+</html>
