@@ -93,31 +93,6 @@
     </div>
 
     <!-- Scripts -->
-    <script src="ISFRenderer.js"></script>
-    <script src="Gui.js"></script>
-    <script src="main.js"></script>
-
-    <script>
-        const btn = document.getElementById('start-btn');
-        const wamContainer = document.getElementById('wam-container');
-
-        btn.addEventListener('click', () => {
-            btn.style.display = 'none';
-            
-            // Le code dans main.js s'occupe du reste,
-            // mais on s'assure que le gui va dans wam-container
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    mutation.addedNodes.forEach((node) => {
-                        if (node.tagName === 'ISF-VISUALIZER-GUI') {
-                            wamContainer.appendChild(node);
-                        }
-                    });
-                });
-            });
-
-            observer.observe(document.body, { childList: true });
-        });
-    </script>
+    <script type="module" src="main.js"></script>
 </body>
 </html>

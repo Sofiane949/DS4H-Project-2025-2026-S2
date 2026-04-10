@@ -3,7 +3,7 @@
  * Interface utilisateur du WAM.
  * Contient UNIQUEMENT les contrôleurs (Menu, Sliders, Couleurs).
  */
-class ISFVisualizerGui extends HTMLElement {
+export class ISFVisualizerGui extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });

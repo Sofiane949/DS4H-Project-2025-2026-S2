@@ -1,0 +1,16 @@
+j'ai developpé un plugin wam isf video qui a deux entrées, une entrée video et une entrée son, l'entrée vidéo sert a pouvoir chainer plusieurs de ses plugins, et l'entrée son sert à faire réagir le shader     
+   généré par rapport à du son, et il y a une sortie video, il se trouve dans @project/src/wam-video-isf-generator/, j'ai mis en place un serveur yarn qui me permet le recuperer via une url, que je build "yarn   
+   build" et puis que je lance "yarn start", ensuite je peux tester mon plugin d'autres app, mais la j'ai une erreur en le testant, sur "https://mainline.i3s.unice.fr/wam2/packages/_/" quand j'essaie de le       
+   charger, dans la console j'ai "Accès au réseau local détecté : site de premier niveau « https://mainline.i3s.unice.fr/wam2/packages/_/ », à l’origine « https://mainline.i3s.unice.fr/wam2/packages/_/ », accède 
+   à la cible « http://localhost:8080/index.js » (127.0.0.1:8080) via http. Contexte sécurisé : True, action de l’invite : (null) GET https://mainline.i3s.unice.fr/wam2/packages/_/descriptor.json Uncaught (in    
+   promise) SyntaxError: JSON.parse: unexpected character at line 1 column 1 of the JSON data", et sur le sequencer party de tom burns, quand j'essaie d'importer le plugin j'ai dans la console "Accès au réseau   
+   local détecté : site de premier niveau « https://editor.sequencer.party/sessions/solo », à l’origine « https://editor.sequencer.party/editor/solo », accède à la cible « http://localhost:8080/index.js »        
+   (127.0.0.1:8080) via http. Contexte sécurisé : True, action de l’invite : (null) solo                                                                                                                            
+   Loaded plugin                                                                                                                                                                                                    
+   class _ {}                                                                                                                                                                                                       
+   PickDeviceModal.tsx:61:17                                                                                                                                                                                        
+   Creating wam instance WAMHost.tsx:86:21                                                                                                                                                                          
+   setting stableID WAMHost.tsx:88:21                                                                                                                                                                               
+   Error loading WAM http://localhost:8080/index.js: SyntaxError: JSON.parse: unexpected character at line 1 column 1 of the JSON data WAMHost.tsx:100:21                                                           
+   Failed to load WAM http://localhost:8080/index.js instance", quel est le soucis ? tu peux peut etre regarder comment la structure des plugins de tom burns est faite dans @burns-audio-wam/src/plugins/,         
+   n'essaie pas de build ou de lancer le serveur, je le ferai moi meme       
