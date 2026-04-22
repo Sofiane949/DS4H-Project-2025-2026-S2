@@ -1,0 +1,9 @@
+[submodule "src/isf-video-wam/sdk"]
+	path = src/isf-video-wam/sdk
+	url = https://github.com/webaudiomodules/sdk.git
+[submodule "src/isf-video-wam/sdk-parammrg"]
+	path = src/isf-video-wam/sdk-parammrg
+	url = https://github.com/webaudiomodules/sdk-parammgr.git
+[submodule "src/isf-video-wam/sdk-parammgr"]
+	path = src/isf-video-wam/sdk-parammgr
+	url = https://github.com/webaudiomodules/sdk-parammgr.git
