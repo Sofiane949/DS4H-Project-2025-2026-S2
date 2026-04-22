@@ -21,10 +21,10 @@ export default class ISFVideoGui extends HTMLElement {
 
     _updateLoop = async () => {
         if (!this.isConnected) return;
-        
+
         try {
             const values = await this.plugin.audioNode.getParameterValues(false);
-            
+
             // Mettre à jour le sélecteur de shader
             const select = this.shadowRoot.getElementById('shaderSelect');
             if (select && !this._isInteractingWithSelect) {
@@ -34,18 +34,18 @@ export default class ISFVideoGui extends HTMLElement {
 
             // Mettre à jour les contrôleurs
             const paramIds = [
-                'distortion1', 'distortion2', 'noiseLevel', 'scroll', 
+                'distortion1', 'distortion2', 'noiseLevel', 'scroll',
                 'speed', 'scanLineThickness', 'scanLineIntensity', 'scanLineOffset',
                 'audioGain', 'audioPulse', 'brightness', 'contrast', 'saturation'
             ];
 
             paramIds.forEach(id => {
                 const el = this.shadowRoot.getElementById(id);
-                if (el && values[id] && !el.drag) { 
+                if (el && values[id] && !el.drag) {
                     el.value = values[id].value;
                 }
             });
-        } catch (e) {}
+        } catch (e) { }
 
         this._raf = requestAnimationFrame(this._updateLoop);
     }
@@ -83,7 +83,6 @@ export default class ISFVideoGui extends HTMLElement {
                 label { font-size: 9px; margin-bottom: 4px; text-transform: uppercase; color: #888; font-weight: bold; text-align: center; }
                 .slider-container { width: 100%; margin-bottom: 8px; display: flex; flex-direction: column; align-items: center; }
             </style>
-            <h3>ISF FX SUITE</h3>
             
             <select id="shaderSelect">
                 ${shaderOptions}
@@ -159,11 +158,11 @@ export default class ISFVideoGui extends HTMLElement {
 
     async initControls() {
         const paramIds = [
-            'distortion1', 'distortion2', 'noiseLevel', 'scroll', 
+            'distortion1', 'distortion2', 'noiseLevel', 'scroll',
             'speed', 'scanLineThickness', 'scanLineIntensity', 'scanLineOffset',
             'audioGain', 'audioPulse', 'brightness', 'contrast', 'saturation'
         ];
-        
+
         const select = this.shadowRoot.getElementById('shaderSelect');
         if (select) {
             select.addEventListener('mousedown', () => this._isInteractingWithSelect = true);
