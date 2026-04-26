@@ -1,14 +1,10 @@
 
 /**
  * Node.js
- * Noeud WAM basé sur CompositeAudioNode, calqué sur Quadrafuzz.
  */
 import CompositeAudioNode from './sdk-parammgr/src/CompositeAudioNode.js';
 
 export default class ISFVideoNode extends CompositeAudioNode {
-    /**
-     * @type {import('../VideoWAMHost/my_video_wam/sdk-parammgr').ParamMgrNode}
-     */
     _wamNode = undefined;
 
     setup(wamNode) {
@@ -19,19 +15,13 @@ export default class ISFVideoNode extends CompositeAudioNode {
     constructor(context, options) {
         super(context, options);
         this.renderer = null;
-
-        // Analyseur pour le RMS (thread principal)
         this._analyser = context.createAnalyser();
         this._analyser.fftSize = 256;
         this._buffer = new Float32Array(this._analyser.fftSize);
-
-        // Comme dans Quadrafuzz, on définit la sortie
         this._output = this.context.createGain();
     }
 
     connectNodes() {
-        // Entrée (this) -> Analyseur
-        // Entrée (this) -> Sortie (bypass audio)
         this.connect(this._analyser);
         this.connect(this._output);
     }
@@ -49,25 +39,11 @@ export default class ISFVideoNode extends CompositeAudioNode {
                 sum += this._buffer[i] * this._buffer[i];
             }
             this.renderer.audioRMS = Math.sqrt(sum / this._buffer.length);
-        } catch (e) {
-            // Sécurité pour éviter TypeError sur Sequencer Party
-        }
+        } catch (e) {}
     }
 
-    // Délégation des méthodes WAM à _wamNode (comme dans Quadrafuzz)
-    getParamValue(name) {
-        return this._wamNode.getParamValue(name);
-    }
-
-    setParamValue(name, value) {
-        return this._wamNode.setParamValue(name, value);
-    }
-
-    getParamsValues() {
-        return this._wamNode.getParamsValues();
-    }
-
-    setParamsValues(values) {
-        return this._wamNode.setParamsValues(values);
-    }
+    getParamValue(name) { return this._wamNode.getParamValue(name); }
+    setParamValue(name, value) { return this._wamNode.setParamValue(name, value); }
+    getParamsValues() { return this._wamNode.getParamsValues(); }
+    setParamsValues(values) { return this._wamNode.setParamsValues(values); }
 }

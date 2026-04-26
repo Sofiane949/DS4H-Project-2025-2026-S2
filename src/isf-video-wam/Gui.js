@@ -1,7 +1,6 @@
 
 /**
- * Gui.js
- * Interface utilisateur complète et dynamique pour le plugin ISF Video.
+ * Gui.js - Version Définitive (Stable & Fluide)
  */
 import './utils/webaudio-controls.js';
 
@@ -10,10 +9,20 @@ export default class ISFVideoGui extends HTMLElement {
         super();
         this.plugin = plugin;
         this.attachShadow({ mode: 'open' });
-        this._isInteractingWithSelect = false;
+        this._rebuildBound = this.rebuild.bind(this);
     }
 
     connectedCallback() {
+        this.plugin.audioNode.addEventListener('shader-changed', this._rebuildBound);
+        this.rebuild();
+    }
+
+    disconnectedCallback() {
+        this.plugin.audioNode.removeEventListener('shader-changed', this._rebuildBound);
+        if (this._raf) cancelAnimationFrame(this._raf);
+    }
+
+    rebuild() {
         this.render();
         this.initControls();
         this._updateLoop();
@@ -21,173 +30,107 @@ export default class ISFVideoGui extends HTMLElement {
 
     _updateLoop = async () => {
         if (!this.isConnected) return;
-
         try {
-            const values = await this.plugin.audioNode.getParameterValues(false);
-
-            // Mettre à jour le sélecteur de shader
+            const values = await this.plugin.audioNode.getParamsValues();
+            
+            // Menu
             const select = this.shadowRoot.getElementById('shaderSelect');
-            if (select && !this._isInteractingWithSelect) {
-                const val = Math.round(values.shaderSelect.value);
+            if (select && document.activeElement !== select) {
+                const val = Math.round(values.shaderSelect.value !== undefined ? values.shaderSelect.value : values.shaderSelect);
                 if (select.value != val) select.value = val;
             }
 
-            // Mettre à jour les contrôleurs
-            const paramIds = [
-                'distortion1', 'distortion2', 'noiseLevel', 'scroll',
-                'speed', 'scanLineThickness', 'scanLineIntensity', 'scanLineOffset',
-                'audioGain', 'audioPulse', 'brightness', 'contrast', 'saturation'
-            ];
-
-            paramIds.forEach(id => {
-                const el = this.shadowRoot.getElementById(id);
-                if (el && values[id] && !el.drag) {
-                    el.value = values[id].value;
+            // Boutons p1..p15
+            const inputs = this.plugin.parser.inputs.filter(i => i.TYPE !== 'image');
+            inputs.forEach((input, index) => {
+                const paramId = (index < 15) ? this.plugin.standardParamIds[index] : null;
+                const el = this.shadowRoot.getElementById(paramId);
+                if (el && values[paramId] && !el.drag) {
+                    const min = input.MIN !== undefined ? input.MIN : 0;
+                    const max = input.MAX !== undefined ? input.MAX : 1;
+                    const normalizedValue = values[paramId].value !== undefined ? values[paramId].value : values[paramId];
+                    el.value = min + (max - min) * normalizedValue;
                 }
             });
-        } catch (e) { }
 
+            // Audio
+            ['audioGain', 'audioPulse'].forEach(id => {
+                const el = this.shadowRoot.getElementById(id);
+                if (el && values[id] && !el.drag) {
+                    el.value = values[id].value !== undefined ? values[id].value : values[id];
+                }
+            });
+        } catch (e) {}
         this._raf = requestAnimationFrame(this._updateLoop);
     }
 
-    disconnectedCallback() {
-        if (this._raf) cancelAnimationFrame(this._raf);
-    }
-
     render() {
-        const shaderOptions = this.plugin.shaders.map((s, i) => `<option value="${i}">${s.replace('.fs', '')}</option>`).join('');
+        const shaderOptions = this.plugin.shaders.map((s, i) => 
+            `<option value="${i}" ${i === this.plugin.currentShaderIndex ? 'selected' : ''}>${s.replace('.fs', '')}</option>`
+        ).join('');
+
+        let dynamicControlsHTML = '';
+        const inputs = this.plugin.parser.inputs.filter(i => i.TYPE !== 'image');
+        inputs.forEach((input, index) => {
+            const paramId = (index < 15) ? this.plugin.standardParamIds[index] : null;
+            if (paramId) {
+                const min = input.MIN !== undefined ? input.MIN : 0;
+                const max = input.MAX !== undefined ? input.MAX : 1;
+                const def = input.DEFAULT !== undefined ? (Array.isArray(input.DEFAULT) ? input.DEFAULT[0] : input.DEFAULT) : 0.5;
+                dynamicControlsHTML += `
+                    <div class="control">
+                        <label>${input.NAME}</label>
+                        <webaudio-knob id="${paramId}" min="${min}" max="${max}" step="0.01" value="${def}" diameter="35"></webaudio-knob>
+                    </div>`;
+            }
+        });
 
         this.shadowRoot.innerHTML = `
             <style>
-                :host {
-                    display: flex;
-                    flex-direction: column;
-                    background: #1a1a1a;
-                    color: #ddd;
-                    padding: 15px;
-                    border-radius: 12px;
-                    font-family: 'Segoe UI', sans-serif;
-                    width: 320px;
-                    box-shadow: 0 4px 25px rgba(0,0,0,0.6);
-                    border: 1px solid #333;
-                }
-                h3 { margin: 0 0 10px 0; font-size: 16px; text-align: center; color: #007bff; text-transform: uppercase; }
-                select { 
-                    width: 100%; background: #252525; color: #007bff; border: 1px solid #333; 
-                    padding: 8px; border-radius: 5px; margin-bottom: 15px; cursor: pointer;
-                    font-weight: bold; outline: none;
-                }
+                :host { display: flex; flex-direction: column; background: #1a1a1a; color: #ddd; padding: 15px; border-radius: 12px; font-family: sans-serif; width: 320px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); border: 1px solid #333; max-height: 550px; overflow-y: auto; }
+                h3 { margin: 0 0 15px 0; font-size: 16px; text-align: center; color: #007bff; text-transform: uppercase; }
+                select { width: 100%; background: #252525; color: #007bff; border: 1px solid #333; padding: 8px; border-radius: 5px; margin-bottom: 15px; cursor: pointer; font-weight: bold; outline: none; }
                 .section-title { font-size: 10px; color: #555; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 3px; text-transform: uppercase; }
-                .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
+                .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
                 .control { display: flex; flex-direction: column; align-items: center; }
-                label { font-size: 9px; margin-bottom: 4px; text-transform: uppercase; color: #888; font-weight: bold; text-align: center; }
-                .slider-container { width: 100%; margin-bottom: 8px; display: flex; flex-direction: column; align-items: center; }
+                label { font-size: 9px; margin-bottom: 5px; text-transform: uppercase; color: #888; font-weight: bold; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
             </style>
-            
-            <select id="shaderSelect">
-                ${shaderOptions}
-            </select>
-
-            <div class="section-title">Glitch & Distortion</div>
+            <h3>ISF FX SUITE</h3>
+            <select id="shaderSelect">${shaderOptions}</select>
+            <div class="section-title">Audio & Master</div>
             <div class="grid">
-                <div class="control">
-                    <label>Distort 1</label>
-                    <webaudio-knob id="distortion1" min="0" max="5" step="0.1" value="0.5" diameter="35"></webaudio-knob>
-                </div>
-                <div class="control">
-                    <label>Distort 2</label>
-                    <webaudio-knob id="distortion2" min="0" max="5" step="0.1" value="1.0" diameter="35"></webaudio-knob>
-                </div>
-                <div class="control">
-                    <label>Noise</label>
-                    <webaudio-knob id="noiseLevel" min="0" max="1" step="0.01" value="0.2" diameter="35"></webaudio-knob>
-                </div>
-                <div class="control">
-                    <label>Scroll</label>
-                    <webaudio-knob id="scroll" min="0" max="1" step="0.01" value="0.0" diameter="35"></webaudio-knob>
-                </div>
+                <div class="control"><label>Audio Gain</label><webaudio-knob id="audioGain" min="0" max="10" step="0.1" value="2.0" diameter="35"></webaudio-knob></div>
+                <div class="control"><label>Audio Pulse</label><webaudio-knob id="audioPulse" min="0" max="2" step="0.01" value="1.0" diameter="35"></webaudio-knob></div>
             </div>
-
-            <div class="section-title">Scanlines & Timing</div>
-            <div class="grid">
-                <div class="control">
-                    <label>Speed</label>
-                    <webaudio-knob id="speed" min="0" max="2" step="0.01" value="0.3" diameter="35"></webaudio-knob>
-                </div>
-                <div class="control">
-                    <label>Line Thick</label>
-                    <webaudio-knob id="scanLineThickness" min="1" max="100" step="1" value="25" diameter="35"></webaudio-knob>
-                </div>
-                <div class="control">
-                    <label>Line Intens</label>
-                    <webaudio-knob id="scanLineIntensity" min="0" max="1" step="0.01" value="0.3" diameter="35"></webaudio-knob>
-                </div>
-                <div class="control">
-                    <label>Line Offset</label>
-                    <webaudio-knob id="scanLineOffset" min="0" max="1" step="0.01" value="0.0" diameter="35"></webaudio-knob>
-                </div>
-            </div>
-
-            <div class="section-title">Audio Reactive</div>
-            <div class="grid">
-                <div class="control">
-                    <label>Audio Gain</label>
-                    <webaudio-knob id="audioGain" min="0" max="10" step="0.1" value="2.0" diameter="35"></webaudio-knob>
-                </div>
-                <div class="control">
-                    <label>Audio Pulse</label>
-                    <webaudio-knob id="audioPulse" min="0" max="2" step="0.01" value="1.0" diameter="35"></webaudio-knob>
-                </div>
-            </div>
-
-            <div class="section-title">Master Image</div>
-            <div class="slider-container">
-                <label>Brightness</label>
-                <webaudio-slider id="brightness" min="0" max="2" step="0.01" value="1.0" width="250" height="12"></webaudio-slider>
-            </div>
-            <div class="slider-container">
-                <label>Contrast</label>
-                <webaudio-slider id="contrast" min="0" max="2" step="0.01" value="1.0" width="250" height="12"></webaudio-slider>
-            </div>
-            <div class="slider-container">
-                <label>Saturation</label>
-                <webaudio-slider id="saturation" min="0" max="2" step="0.01" value="1.0" width="250" height="12"></webaudio-slider>
-            </div>
+            <div class="section-title">Shader Parameters</div>
+            <div class="grid">${dynamicControlsHTML}</div>
         `;
     }
 
-    async initControls() {
-        const paramIds = [
-            'distortion1', 'distortion2', 'noiseLevel', 'scroll',
-            'speed', 'scanLineThickness', 'scanLineIntensity', 'scanLineOffset',
-            'audioGain', 'audioPulse', 'brightness', 'contrast', 'saturation'
-        ];
-
+    initControls() {
         const select = this.shadowRoot.getElementById('shaderSelect');
         if (select) {
-            select.addEventListener('mousedown', () => this._isInteractingWithSelect = true);
-            select.addEventListener('blur', () => this._isInteractingWithSelect = false);
             select.addEventListener('change', (e) => {
                 this.plugin.audioNode.setParamsValues({ shaderSelect: parseInt(e.target.value) });
-                this._isInteractingWithSelect = false;
             });
         }
 
+        const paramIds = [...this.plugin.standardParamIds, 'audioGain', 'audioPulse'];
         paramIds.forEach(id => {
             const el = this.shadowRoot.getElementById(id);
             if (el) {
                 el.addEventListener('input', (e) => {
-                    this.plugin.audioNode.setParamsValues({ [id]: parseFloat(e.target.value) });
+                    let val = parseFloat(e.target.value);
+                    if (id.startsWith('p')) {
+                        const min = parseFloat(e.target.min);
+                        const max = parseFloat(e.target.max);
+                        val = (val - min) / (max - min || 1);
+                    }
+                    this.plugin.audioNode.setParamsValues({ [id]: val });
                 });
             }
         });
     }
 }
-
-if (!customElements.get('isf-video-gui')) {
-    customElements.define('isf-video-gui', ISFVideoGui);
-}
-
-export async function createElement(plugin) {
-    return new ISFVideoGui(plugin);
-}
+customElements.get('isf-video-gui') || customElements.define('isf-video-gui', ISFVideoGui);
+export async function createElement(plugin) { return new ISFVideoGui(plugin); }

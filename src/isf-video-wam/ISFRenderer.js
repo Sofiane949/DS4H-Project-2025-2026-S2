@@ -13,6 +13,10 @@ export default class ISFRenderer {
     this.startTime = performance.now();
     this.frameIndex = 0;
     this.audioRMS = 0;
+    this.audioGain = 2.0;
+    this.audioPulse = 1.0;
+    this.cumulativeTime = 0;
+    this.lastFrameTime = performance.now();
     
     // Stockage des valeurs des paramètres
     this.values = new Map();
@@ -104,8 +108,15 @@ export default class ISFRenderer {
     gl.enableVertexAttribArray(posAttr);
     gl.vertexAttribPointer(posAttr, 2, gl.FLOAT, false, 0, 0);
 
+    // Temps réactif à l'audio
+    const now = performance.now();
+    const dt = (now - this.lastFrameTime) / 1000;
+    this.lastFrameTime = now;
+    const audioFactor = 1.0 + (this.audioRMS * this.audioGain * this.audioPulse);
+    this.cumulativeTime += dt * audioFactor;
+
     // Uniforms de base
-    this._applyUniform('TIME', (performance.now() - this.startTime) / 1000);
+    this._applyUniform('TIME', this.cumulativeTime);
     this._applyUniform('RENDERSIZE', [width, height]);
     this._applyUniform('FRAMEINDEX', this.frameIndex++);
     this._applyUniform('AUDIO_RMS', this.audioRMS);
