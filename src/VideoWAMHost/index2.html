@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WAM Video Host — 3D Scene</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
+
+    /* Three.js injecte son canvas directement dans body */
+    body > canvas {
+      position: fixed !important;
+      inset: 0;
+      z-index: 0;
+    }
+
+    /* ---- Overlay de démarrage ---- */
+    #overlay {
+      position: fixed; inset: 0; z-index: 20;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at center, #04041a 0%, #000 100%);
+    }
+    #overlay h1 {
+      color: #3af; font-size: 2.4rem; letter-spacing: 8px;
+      text-shadow: 0 0 24px #3af9; margin-bottom: 0.6rem;
+    }
+    #overlay p { color: #446; font-size: 0.88rem; letter-spacing: 2px; margin-bottom: 2.8rem; }
+    #start-btn {
+      padding: 14px 60px; font-size: 1rem; font-family: inherit;
+      background: transparent; color: #3af; border: 1px solid #3af6;
+      letter-spacing: 4px; cursor: pointer; transition: all 0.2s; text-transform: uppercase;
+    }
+    #start-btn:hover { background: #3af; color: #000; box-shadow: 0 0 36px #3afa; }
+
+    /* Canvas WAM caché (rendu WebGL off-screen) */
+    #wam-canvas { position: fixed; left: -9999px; top: 0; pointer-events: none; }
+
+    /* Panneau GUI plugin en bas */
+    #ui-panel {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: rgba(0, 3, 18, 0.88);
+      border-top: 1px solid #3af3;
+      padding: 10px 20px; z-index: 10; display: none;
+      max-height: 45vh; overflow-y: auto;
+    }
+    #instrument-container { display: inline-block; vertical-align: middle; }
+
+    #hint {
+      position: fixed; bottom: 14px; right: 18px;
+      color: #3af5; font-size: 0.7rem; letter-spacing: 1px;
+      pointer-events: none; z-index: 5;
+    }
+
+    #status {
+      position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+      color: #3af7; font-size: 0.75rem; letter-spacing: 2px;
+      pointer-events: none; z-index: 5; display: none;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Canvas de rendu WAM (caché, WebGL) -->
+<canvas id="wam-canvas" width="640" height="480"></canvas>
+
+<!-- Écran d'accueil -->
+<div id="overlay">
+  <h1>WAM VIDEO 3D</h1>
+  <p>ISF VIDEO WAM · MESH 3D DISPLAY</p>
+  <button id="start-btn">LAUNCH</button>
+</div>
+
+<!-- GUI du plugin WAM -->
+<div id="ui-panel">
+  <div id="instrument-container"></div>
+</div>
+
+<div id="hint">drag · scroll · right-click pan</div>
+<div id="status" id="status">LOADING WAM...</div>
+
+<!-- Importmap Three.js (CDN, sans build step) -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import VideoExtension from './js/extensions/VideoExtension.js';
+import { CanvasRenderer } from './js/extensions/videoExtensionHostSide.js';
+
+// ============================================================
+//  ÉTAT GLOBAL
+// ============================================================
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+const audioContext = new AudioCtx();
+
+let wamRenderer;           // CanvasRenderer qui dessine dans le canvas WAM caché
+let canvasTexture;         // THREE.CanvasTexture lisant ce canvas à chaque frame
+let videoPlugins = [];     // instances WAM chargées
+let wamExtensions = [];    // delegates video de chaque plugin
+
+let threeRenderer, threeScene, threeCamera, orbitControls;
+
+// ============================================================
+//  INIT WAM HOST + EXTENSIONS
+// ============================================================
+async function initHost() {
+  const { default: initializeWamHost } =
+    await import('https://www.webaudiomodules.com/sdk/2.0.0-alpha.6/src/initializeWamHost.js');
+  await initializeWamHost(audioContext, 'example');
+  window.WAMExtensions = window.WAMExtensions || {};
+  window.WAMExtensions.video = new VideoExtension();
+}
+
+// ============================================================
+//  CHARGEMENT D'UN WAM
+// ============================================================
+async function loadWAM(path) {
+  const { default: WAM } = await import(path);
+  if (typeof WAM !== 'function' || !WAM.isWebAudioModuleConstructor)
+    throw new Error(`${path} n'est pas un WebAudioModule valide.`);
+  const instance = new WAM('example', audioContext);
+  await instance.initialize({});
+  return instance;
+}
+
+// ============================================================
+//  INIT RENDU VIDÉO WAM → canvas caché
+//
+//  TRICK CLÉ : on pré-crée le contexte WebGL2 avec
+//  preserveDrawingBuffer:true AVANT que CanvasRenderer ne le
+//  fasse. Le navigateur retourne ensuite ce même contexte à
+//  CanvasRenderer (les attributs de la 2ème demande sont ignorés).
+//  Sans ça, Three.js lirait un buffer vide après la présentation.
+// ============================================================
+function initWAMVideo() {
+  const wamCanvas = document.getElementById('wam-canvas');
+
+  wamCanvas.getContext('webgl2', { preserveDrawingBuffer: true })
+    ?? wamCanvas.getContext('webgl', { preserveDrawingBuffer: true });
+
+  wamRenderer = new CanvasRenderer(wamCanvas);
+
+  canvasTexture = new THREE.CanvasTexture(wamCanvas);
+  canvasTexture.minFilter    = THREE.LinearFilter;
+  canvasTexture.magFilter    = THREE.LinearFilter;
+  canvasTexture.generateMipmaps = false;
+  // Flip Y pour correspondre aux coordonnées WebGL du WAM
+  canvasTexture.flipY = true;
+}
+
+// ============================================================
+//  CONSTRUCTION DE LA SCÈNE THREE.JS
+// ============================================================
+function buildScene() {
+  // -- Renderer --
+  threeRenderer = new THREE.WebGLRenderer({ antialias: true });
+  threeRenderer.setPixelRatio(window.devicePixelRatio);
+  threeRenderer.setSize(window.innerWidth, window.innerHeight);
+  threeRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+  threeRenderer.toneMappingExposure = 1.1;
+  document.body.appendChild(threeRenderer.domElement);
+
+  // -- Scène --
+  threeScene = new THREE.Scene();
+  threeScene.background = new THREE.Color(0x00020f);
+  threeScene.fog = new THREE.FogExp2(0x00020f, 0.035);
+
+  // -- Caméra --
+  threeCamera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
+  threeCamera.position.set(0, 0.8, 5.5);
+
+  // -- Contrôles orbite --
+  orbitControls = new OrbitControls(threeCamera, threeRenderer.domElement);
+  orbitControls.enableDamping  = true;
+  orbitControls.dampingFactor  = 0.06;
+  orbitControls.target.set(0, 0, 0);
+  orbitControls.minDistance    = 1.5;
+  orbitControls.maxDistance    = 18;
+  orbitControls.maxPolarAngle  = Math.PI * 0.82;
+
+  // ---- Lumières ----
+  threeScene.add(new THREE.AmbientLight(0x0a1840, 5));
+
+  const keyLight = new THREE.PointLight(0x4488ff, 8, 35);
+  keyLight.position.set(4, 5, 4);
+  threeScene.add(keyLight);
+
+  const rimLight = new THREE.PointLight(0x00ffcc, 4, 22);
+  rimLight.position.set(-5, -1, -4);
+  threeScene.add(rimLight);
+
+  // Halo de l'écran (pulsera dans la boucle d'animation)
+  const screenGlow = new THREE.PointLight(0x2255ff, 5, 9);
+  screenGlow.position.set(0, 0, 0.6);
+  threeScene.add(screenGlow);
+
+  // ---- Écran principal : la texture WAM est appliquée ici ----
+  const SW = 3.2, SH = 2.4;   // ratio 4:3 — même que le canvas WAM 640×480
+  const screenMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(SW, SH),
+    new THREE.MeshBasicMaterial({ map: canvasTexture, side: THREE.FrontSide })
+  );
+  threeScene.add(screenMesh);
+
+  // ---- Châssis / cadre de l'écran ----
+  const frameW = SW + 0.2, frameH = SH + 0.2, frameD = 0.09;
+  const frameMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(frameW, frameH, frameD),
+    new THREE.MeshStandardMaterial({ color: 0x0c1020, metalness: 0.92, roughness: 0.12 })
+  );
+  frameMesh.position.z = -(frameD / 2 + 0.002);
+  threeScene.add(frameMesh);
+
+  // Arêtes lumineuses sur le cadre
+  const edgeMesh = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(frameW + 0.01, frameH + 0.01, frameD + 0.01)),
+    new THREE.LineBasicMaterial({ color: 0x3388ff })
+  );
+  edgeMesh.position.copy(frameMesh.position);
+  threeScene.add(edgeMesh);
+
+  // Épaulement arrière du boîtier
+  const housingMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(frameW - 0.1, frameH - 0.1, 0.4),
+    new THREE.MeshStandardMaterial({ color: 0x08101e, metalness: 0.7, roughness: 0.3 })
+  );
+  housingMesh.position.z = -(frameD + 0.22);
+  threeScene.add(housingMesh);
+
+  // ---- Sol / grille ----
+  const grid1 = new THREE.GridHelper(50, 70, 0x001133, 0x000a20);
+  grid1.position.y = -3.2;
+  threeScene.add(grid1);
+
+  const grid2 = new THREE.GridHelper(50, 18, 0x002255, 0x000e2a);
+  grid2.position.y = -3.21;
+  threeScene.add(grid2);
+
+  // ---- Particules (étoiles / poussière) ----
+  const N = 900;
+  const starPos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    starPos[i * 3]     = (Math.random() - 0.5) * 70;
+    starPos[i * 3 + 1] = (Math.random() - 0.5) * 35;
+    starPos[i * 3 + 2] = (Math.random() - 0.5) * 70;
+  }
+  const starGeo = new THREE.BufferGeometry();
+  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+  threeScene.add(new THREE.Points(
+    starGeo,
+    new THREE.PointsMaterial({ color: 0x5599ff, size: 0.045, transparent: true, opacity: 0.65 })
+  ));
+
+  // ---- Cubes décoratifs flottants ----
+  const cubeMat = new THREE.MeshStandardMaterial({ color: 0x0d1a33, metalness: 0.85, roughness: 0.25 });
+  const decorCubes = [];
+  for (let i = 0; i < 8; i++) {
+    const s = 0.1 + Math.random() * 0.2;
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), cubeMat.clone());
+    const angle  = (i / 8) * Math.PI * 2;
+    const radius = 3 + Math.random() * 2;
+    mesh.position.set(
+      Math.cos(angle) * radius,
+      (Math.random() - 0.5) * 2.5,
+      Math.sin(angle) * radius - 0.5
+    );
+    mesh.userData.phase = Math.random() * Math.PI * 2;
+    mesh.userData.speed = 0.25 + Math.random() * 0.55;
+    mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+    threeScene.add(mesh);
+    decorCubes.push(mesh);
+
+    // Arêtes glow sur certains cubes
+    if (i % 2 === 0) {
+      const edge = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(s + 0.01, s + 0.01, s + 0.01)),
+        new THREE.LineBasicMaterial({ color: 0x3366aa })
+      );
+      edge.position.copy(mesh.position);
+      edge.rotation.copy(mesh.rotation);
+      mesh.userData.edgeMesh = edge;
+      threeScene.add(edge);
+    }
+  }
+
+  // ---- Resize ----
+  window.addEventListener('resize', () => {
+    threeCamera.aspect = window.innerWidth / window.innerHeight;
+    threeCamera.updateProjectionMatrix();
+    threeRenderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  return { screenMesh, screenGlow, decorCubes };
+}
+
+// ============================================================
+//  POINT D'ENTRÉE PRINCIPAL
+// ============================================================
+async function run() {
+  const statusEl = document.getElementById('status');
+  statusEl.style.display = 'block';
+  document.getElementById('overlay').style.display = 'none';
+
+  statusEl.textContent = 'INIT WAM HOST...';
+  await initHost();
+
+  statusEl.textContent = 'INIT VIDEO PIPELINE...';
+  initWAMVideo();
+
+  statusEl.textContent = 'BUILDING 3D SCENE...';
+  const { screenMesh, screenGlow, decorCubes } = buildScene();
+
+  statusEl.textContent = 'LOADING ISF VIDEO WAM...';
+  // Utilise la version locale (src/isf-video-wam/) qui contient les bug fixes
+  // (mapping uniforms, _changeShader fonctionnel, DEFAULT initialisés).
+  // ⚠ Servir depuis la RACINE du projet : npx serve . (pas depuis VideoWAMHost/)
+  //   puis ouvrir http://localhost:3000/src/VideoWAMHost/index2.html
+  const plugin = await loadWAM('../isf-video-wam/index.js');
+
+  plugin.audioNode.connect(audioContext.destination);
+  const gui = await plugin.createGui();
+  document.getElementById('instrument-container').appendChild(gui);
+  document.getElementById('ui-panel').style.display = 'block';
+
+  videoPlugins.push(plugin);
+  wamExtensions = videoPlugins.map(v => window.WAMExtensions.video.getDelegate(v.instanceId));
+
+  // Connecte le plugin à notre contexte WebGL WAM caché
+  for (const ext of wamExtensions) {
+    ext.connectVideo({ width: 640, height: 480, gl: wamRenderer.gl });
+  }
+
+  statusEl.style.display = 'none';
+
+  // ============================================================
+  //  BOUCLE D'ANIMATION PRINCIPALE
+  //
+  //  Ordre important chaque frame :
+  //  1. Le plugin WAM rend dans des textures WebGL (son contexte GL)
+  //  2. CanvasRenderer dessine ces textures sur le canvas WAM caché
+  //  3. canvasTexture.needsUpdate = true → Three.js re-upload le canvas
+  //  4. Three.js rend la scène 3D avec la texture à jour sur le mesh
+  // ============================================================
+  const clock = new THREE.Clock();
+
+  function animate() {
+    requestAnimationFrame(animate);
+    const t = clock.getElapsedTime();
+
+    // -- 1 & 2 : Rendu WAM vidéo --
+    let inputs = [];
+    const audioT = audioContext.currentTime;
+    for (const ext of wamExtensions) {
+      inputs = ext.render(inputs, audioT);
+    }
+    if (inputs[0]) {
+      wamRenderer.render(inputs[0]);
+      // Signale à Three.js que le canvas source a changé
+      canvasTexture.needsUpdate = true;
+    }
+
+    // -- Animations scène --
+
+    // Légère respiration de l'écran
+    const pulse = 1 + Math.sin(t * 0.9) * 0.003;
+    screenMesh.scale.set(pulse, pulse, 1);
+
+    // Halo qui pulse
+    screenGlow.intensity = 3.5 + Math.sin(t * 1.6) * 1.5;
+
+    // Cubes flottants qui tournent
+    for (const cube of decorCubes) {
+      cube.rotation.x += 0.004 * cube.userData.speed;
+      cube.rotation.y += 0.007 * cube.userData.speed;
+      const drift = Math.sin(t * cube.userData.speed + cube.userData.phase) * 0.001;
+      cube.position.y += drift;
+      if (cube.userData.edgeMesh) {
+        cube.userData.edgeMesh.rotation.copy(cube.rotation);
+        cube.userData.edgeMesh.position.copy(cube.position);
+      }
+    }
+
+    // -- 3 & 4 : Rendu Three.js --
+    orbitControls.update();
+    threeRenderer.render(threeScene, threeCamera);
+  }
+
+  animate();
+}
+
+document.getElementById('start-btn').addEventListener('click', () => run());
+</script>
+</body>
+</html>
