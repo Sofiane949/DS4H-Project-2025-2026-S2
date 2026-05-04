@@ -165,6 +165,15 @@ function buildScene() {
   screenMat.disableLighting = true;
   screen.material = screenMat;
 
+  // Ajout d'un cube et d'une sphère affichant également le shader
+  const cube = BABYLON.MeshBuilder.CreateBox('cube', { size: 1.2 }, scene);
+  cube.position.set(-2.8, 0, 0.5);
+  cube.material = screenMat;
+
+  const sphere = BABYLON.MeshBuilder.CreateSphere('sphere', { diameter: 1.2 }, scene);
+  sphere.position.set(2.8, 0, 0.5);
+  sphere.material = screenMat;
+
   // Cadre métallique
   const frameW = SW + 0.2, frameH = SH + 0.2, frameD = 0.09;
   const frame = BABYLON.MeshBuilder.CreateBox('frame', { width: frameW, height: frameH, depth: frameD }, scene);
