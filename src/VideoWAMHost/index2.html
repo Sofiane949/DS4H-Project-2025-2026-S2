@@ -1,335 +1,123 @@
 <!DOCTYPE html>
 <html lang="fr">
-
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WAM Video Host — 3D Scene (Babylon.js)</title>
+  <title>WAM Video Host — 3D Scene (Hybrid Optimized)</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      background: #000;
-      overflow: hidden;
-      font-family: 'Courier New', monospace;
-    }
-
-    #renderCanvas {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 0;
-      touch-action: none;
-    }
-
-    #overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 20;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: radial-gradient(ellipse at center, #04041a 0%, #000 100%);
-    }
-
-    #overlay h1 {
-      color: #3af;
-      font-size: 2.4rem;
-      letter-spacing: 8px;
-      text-shadow: 0 0 24px #3af9;
-      margin-bottom: 0.6rem;
-    }
-
-    #overlay p {
-      color: #446;
-      font-size: 0.88rem;
-      letter-spacing: 2px;
-      margin-bottom: 2.8rem;
-    }
-
-    #start-btn {
-      padding: 14px 60px;
-      font-size: 1rem;
-      font-family: inherit;
-      background: transparent;
-      color: #3af;
-      border: 1px solid #3af6;
-      letter-spacing: 4px;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-transform: uppercase;
-    }
-
-    #start-btn:hover {
-      background: #3af;
-      color: #000;
-      box-shadow: 0 0 36px #3afa;
-    }
-
-    #wam-canvas {
-      position: fixed;
-      left: -9999px;
-      top: 0;
-      pointer-events: none;
-    }
-
-    #ui-panel {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: rgba(0, 3, 18, 0.88);
-      border-top: 1px solid #3af3;
-      padding: 10px 20px;
-      z-index: 10;
-      display: none;
-      max-height: 45vh;
-      overflow-y: auto;
-    }
-
-    #instrument-container {
-      display: inline-block;
-      vertical-align: middle;
-    }
-
-    #hint {
-      position: fixed;
-      bottom: 14px;
-      right: 18px;
-      color: #3af5;
-      font-size: 0.7rem;
-      letter-spacing: 1px;
-      pointer-events: none;
-      z-index: 5;
-    }
-
-    #status {
-      position: fixed;
-      top: 14px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: #3af7;
-      font-size: 0.75rem;
-      letter-spacing: 2px;
-      pointer-events: none;
-      z-index: 5;
-      display: none;
-    }
-
-    #error-box {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(80, 0, 0, 0.92);
-      border: 1px solid #f44;
-      color: #faa;
-      font-size: 0.8rem;
-      padding: 18px 24px;
-      max-width: 80vw;
-      z-index: 30;
-      display: none;
-      white-space: pre-wrap;
-      font-family: monospace;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; font-family: sans-serif; }
+    #renderCanvas { position: fixed; inset: 0; width: 100%; height: 100%; }
+    #overlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: #001; }
+    #start-btn { padding: 20px 60px; font-size: 1.5rem; background: #3af; color: #fff; border: none; cursor: pointer; border-radius: 4px; }
+    #ui-panel { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.9); padding: 10px; z-index: 10; display: none; }
+    #wam-canvas { position: fixed; top: 0; left: 0; visibility: hidden; pointer-events: none; }
   </style>
 </head>
-
 <body>
-
+  <!-- Canvas caché pour le rendu WAM -->
   <canvas id="wam-canvas" width="640" height="480"></canvas>
   <canvas id="renderCanvas"></canvas>
 
   <div id="overlay">
-    <h1>WAM VIDEO 3D</h1>
-    <p>ISF VIDEO WAM · MESH 3D DISPLAY</p>
-    <button id="start-btn">LAUNCH</button>
+    <button id="start-btn">LANCER LE MOTEUR 3D</button>
   </div>
-
-  <div id="ui-panel">
-    <div id="instrument-container"></div>
-  </div>
-
-  <div id="hint">drag · scroll · right-click pan</div>
-  <div id="status">LOADING WAM...</div>
-  <div id="error-box"></div>
+  <div id="ui-panel"><div id="instrument-container"></div></div>
 
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
-
   <script type="module">
     import VideoExtension from './js/extensions/VideoExtension.js';
-    import {CanvasRenderer} from './js/extensions/videoExtensionHostSide.js';
+    import { CanvasRenderer } from './js/extensions/videoExtensionHostSide.js';
 
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    const audioContext = new AudioCtx();
-
-    let wamRenderer;
-    let wamTexture;
-    let wamCtx;
-    let videoPlugins = [];
-    let wamExtensions = [];
-    let engine, scene;
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    let engine, scene, wamTexture, wamRenderer;
 
     async function initHost() {
-      const {default: initializeWamHost} =
-        await import('https://www.webaudiomodules.com/sdk/2.0.0-alpha.6/src/initializeWamHost.js');
-      await initializeWamHost(audioContext, 'example');
+      const {default: init} = await import('https://www.webaudiomodules.com/sdk/2.0.0-alpha.6/src/initializeWamHost.js');
+      await init(audioContext, 'example');
       window.WAMExtensions = window.WAMExtensions || {};
       window.WAMExtensions.video = new VideoExtension();
-    }
-
-    async function loadWAM(path) {
-      const {default: WAM} = await import(path);
-      if (typeof WAM !== 'function' || !WAM.isWebAudioModuleConstructor)
-        throw new Error(`${path} n'est pas un WebAudioModule valide.`);
-      const instance = new WAM('example', audioContext);
-      await instance.initialize({});
-      return instance;
-    }
-
-    function initWAMVideo() {
-      const wamCanvas = document.getElementById('wam-canvas');
-      // preserveDrawingBuffer:true requis pour que drawImage() lise le canvas WebGL
-      wamCanvas.getContext('webgl2', {preserveDrawingBuffer: true})
-        ?? wamCanvas.getContext('webgl', {preserveDrawingBuffer: true});
-      wamRenderer = new CanvasRenderer(wamCanvas);
     }
 
     function buildScene() {
       const canvas = document.getElementById('renderCanvas');
       engine = new BABYLON.Engine(canvas, true);
       scene = new BABYLON.Scene(engine);
-      scene.clearColor = new BABYLON.Color4(0, 0.008, 0.06, 1);
+      scene.clearColor = new BABYLON.Color4(0.05, 0.05, 0.1, 1);
 
-      const camera = new BABYLON.ArcRotateCamera('cam', -Math.PI / 2, Math.PI / 2.5, 6, BABYLON.Vector3.Zero(), scene);
-      camera.lowerRadiusLimit = 1.5;
-      camera.upperRadiusLimit = 18;
-      camera.upperBetaLimit = Math.PI * 0.82;
-      camera.wheelDeltaPercentage = 0.01;
+      const camera = new BABYLON.ArcRotateCamera("cam", -Math.PI/2, 1.2, 7, BABYLON.Vector3.Zero(), scene);
       camera.attachControl(canvas, true);
 
-      const hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 1, 0), scene);
-      hemi.intensity = 0.15;
+      // OPTIMISATION : Utilisation de HtmlElementTexture sur le canvas WAM
+      // C'est beaucoup plus rapide que DynamicTexture + drawImage
+      const wamCanvas = document.getElementById('wam-canvas');
+      wamTexture = new BABYLON.HtmlElementTexture("wamTex", wamCanvas, {
+        engine: engine,
+        generateMipMaps: false,
+        samplingMode: BABYLON.Constants.TEXTURE_BILINEAR_SAMPLINGMODE
+      });
 
-      const keyLight = new BABYLON.PointLight('key', new BABYLON.Vector3(4, 5, -4), scene);
-      keyLight.diffuse = new BABYLON.Color3(0.27, 0.53, 1);
-      keyLight.specular = new BABYLON.Color3(0.1, 0.2, 0.4);
-      keyLight.intensity = 6;
+      const mat = new BABYLON.StandardMaterial("mat", scene);
+      mat.emissiveTexture = wamTexture;
+      mat.disableLighting = true;
 
-      // Texture lisant le canvas WAM via drawImage chaque frame
-      wamTexture = new BABYLON.DynamicTexture('wamTex', {width: 640, height: 480}, scene, false);
-      wamTexture.wrapU = BABYLON.Texture.CLAMP_ADDRESSMODE;
-      wamTexture.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
-      // Flip vertical pour corriger l'origine bas-gauche WebGL
-      wamTexture.vScale = -1;
-      wamTexture.vOffset = 1;
-      wamCtx = wamTexture.getContext();
+      // Affichage sur plusieurs objets
+      const wall = BABYLON.MeshBuilder.CreatePlane("wall", {width: 8, height: 6}, scene);
+      wall.material = mat;
 
-      // Écran 4:3 (même ratio que canvas WAM 640×480)
-      const SW = 3.2, SH = 2.4;
-      const screen = BABYLON.MeshBuilder.CreatePlane('screen', {width: SW, height: SH}, scene);
-      const screenMat = new BABYLON.StandardMaterial('screenMat', scene);
-      screenMat.emissiveTexture = wamTexture;
-      screenMat.disableLighting = true;
-      screen.material = screenMat;
+      const sphere = BABYLON.MeshBuilder.CreateSphere("sphere", {diameter: 2}, scene);
+      sphere.position.set(4, 0, 2);
+      sphere.material = mat;
 
-      // Ajout d'un cube et d'une sphère affichant également le shader
-      const cube = BABYLON.MeshBuilder.CreateBox('cube', {size: 1.2}, scene);
-      cube.position.set(-2.8, 0, 0.5);
-      cube.material = screenMat;
-
-      const sphere = BABYLON.MeshBuilder.CreateSphere('sphere', {diameter: 1.2}, scene);
-      sphere.position.set(2.8, 0, 0.5);
-      sphere.material = screenMat;
-
-      // Cadre métallique
-      const frameW = SW + 0.2, frameH = SH + 0.2, frameD = 0.09;
-      const frame = BABYLON.MeshBuilder.CreateBox('frame', {width: frameW, height: frameH, depth: frameD}, scene);
-      frame.position.z = frameD / 2 + 0.002;
-      const frameMat = new BABYLON.PBRMetallicRoughnessMaterial('frameMat', scene);
-      frameMat.baseColor = new BABYLON.Color3(0.05, 0.06, 0.13);
-      frameMat.metallic = 0.92;
-      frameMat.roughness = 0.12;
-      frame.material = frameMat;
+      const ground = BABYLON.MeshBuilder.CreateGround("ground", {width: 20, height: 20}, scene);
+      ground.position.y = -3;
+      ground.material = mat;
 
       window.addEventListener('resize', () => engine.resize());
     }
 
-    function showError(msg) {
-      const box = document.getElementById('error-box');
-      box.textContent = '❌ ' + msg;
-      box.style.display = 'block';
-      document.getElementById('status').style.display = 'none';
-      console.error('[WAM HOST]', msg);
-    }
-
     async function run() {
-      const statusEl = document.getElementById('status');
-      statusEl.style.display = 'block';
       document.getElementById('overlay').style.display = 'none';
+      if (audioContext.state === 'suspended') await audioContext.resume();
 
-      try {
-        if (typeof BABYLON === 'undefined') throw new Error('Babylon.js non chargé — vérifie ta connexion internet.');
+      // 1. Init WAM Host
+      await initHost();
 
-        statusEl.textContent = 'INIT WAM HOST...';
-        await initHost();
+      // 2. Init Renderer WAM (WebGL pur)
+      const wamCanvas = document.getElementById('wam-canvas');
+      wamRenderer = new CanvasRenderer(wamCanvas);
 
-        statusEl.textContent = 'INIT VIDEO PIPELINE...';
-        initWAMVideo();
+      // 3. Init Babylon
+      buildScene();
 
-        statusEl.textContent = 'BUILDING 3D SCENE...';
-        buildScene();
+      // 4. Load Plugin
+      const {default: WAM} = await import('https://www.webaudiomodules.com/community/plugins/burns-audio/video_butterchurn/index.js');
+      const instance = new WAM('example', audioContext);
+      await instance.initialize({});
+      instance.audioNode.connect(audioContext.destination);
 
-        statusEl.textContent = 'LOADING BUTTERCHURN WAM...';
-        const plugin = await loadWAM('https://www.webaudiomodules.com/community/plugins/burns-audio/video_butterchurn/index.js');
+      const gui = await instance.createGui();
+      document.getElementById('instrument-container').appendChild(gui);
+      document.getElementById('ui-panel').style.display = 'block';
 
-        plugin.audioNode.connect(audioContext.destination);
-        const gui = await plugin.createGui();
-        document.getElementById('instrument-container').appendChild(gui);
-        document.getElementById('ui-panel').style.display = 'block';
+      const delegate = window.WAMExtensions.video.getDelegate(instance.instanceId);
+      delegate.connectVideo({ width: 640, height: 480, gl: wamRenderer.gl });
 
-        videoPlugins.push(plugin);
-        wamExtensions = videoPlugins.map(v => window.WAMExtensions.video.getDelegate(v.instanceId));
-
-        const delegate = wamExtensions[0];
-        if (!delegate) throw new Error('Delegate vidéo introuvable — le plugin n\'a pas enregistré sa VideoExtension.');
-
-        for (const ext of wamExtensions) {
-          ext.connectVideo({width: 640, height: 480, gl: wamRenderer.gl});
+      // Boucle de rendu
+      scene.onBeforeRenderObservable.add(() => {
+        const inputs = delegate.render([], audioContext.currentTime);
+        if (inputs && inputs[0]) {
+          // On dessine la texture du WAM dans le canvas caché via WebGL
+          wamRenderer.render(inputs[0]);
+          // On dit à Babylon de mettre à jour sa texture à partir du canvas
+          // HtmlElementTexture gère cela de manière très optimisée
+          wamTexture.update();
         }
+      });
 
-        statusEl.style.display = 'none';
-
-        const wamCanvas = document.getElementById('wam-canvas');
-
-        scene.registerBeforeRender(() => {
-          let inputs = [];
-          const audioT = audioContext.currentTime;
-          for (const ext of wamExtensions) {
-            inputs = ext.render(inputs, audioT);
-          }
-          if (inputs[0]) {
-            wamRenderer.render(inputs[0]);
-            wamCtx.drawImage(wamCanvas, 0, 0);
-            wamTexture.update();
-          }
-        });
-
-        engine.runRenderLoop(() => scene.render());
-
-      } catch (err) {
-        showError(err.message || String(err));
-      }
+      engine.runRenderLoop(() => scene.render());
     }
 
-    document.getElementById('start-btn').addEventListener('click', () => run());
+    document.getElementById('start-btn').addEventListener('click', run);
   </script>
 </body>
-
 </html>
